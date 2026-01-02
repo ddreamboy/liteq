@@ -1,8 +1,4 @@
-"""
-LiteQ - A lightweight message queue for Python
-"""
-
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 from liteq.decorators import task
 from liteq.worker import Worker
