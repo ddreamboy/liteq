@@ -30,7 +30,9 @@ async def send_campaign_email(user_id: int, campaign_id: int):
     if not user:
         raise ValueError(f"User {user_id} not found")
 
-    logging.info(f"Sending campaign {campaign_id} to {user['name']} ({user['email']})")
+    logging.info(
+        f"Sending campaign {campaign_id} to {user['name']} ({user['email']})"
+    )
     await asyncio.sleep(0.3)  # Simulate email sending
     logging.info(f"Email sent to {user['name']}")
 
