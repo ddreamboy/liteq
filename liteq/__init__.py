@@ -1,4 +1,4 @@
-__version__ = "0.1.1"
+__version__ = "0.1.0"
 
 from liteq.decorators import task
 from liteq.worker import Worker
