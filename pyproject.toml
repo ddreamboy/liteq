@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "liteq"
+version = "0.1.0"
+description = "A lightweight message queue for Python with no dependencies"
+readme = "README.md"
+authors = [
+    {name = "Arkadiy Senin", email = "senin.arkadiy@gmail.com"}
+]
+license = {text = "MIT"}
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Distributed Computing",
+]
+keywords = ["queue", "task", "async", "message-queue", "job-queue", "background-tasks"]
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "black>=22.0",
+    "ruff>=0.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/ddreamboy/liteq"
+Documentation = "https://github.com/ddreamboy/liteq#readme"
+Repository = "https://github.com/ddreamboy/liteq.git"
+Issues = "https://github.com/ddreamboy/liteq/issues"
+
+[tool.setuptools]
+packages = ["liteq"]
+
+[tool.setuptools.package-data]
+liteq = ["py.typed"]
+
+[tool.black]
+line-length = 100
+target-version = ['py310']
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
