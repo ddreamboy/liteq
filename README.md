@@ -1,0 +1,1 @@
+Simple vanila python Message Queue
