@@ -7,6 +7,10 @@
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
 </p>
 
+<p align="center">
+  <b>Translations:</b> <a href="docs/README_ru.md">🇷🇺 Русский</a>
+</p>
+
 A lightweight, fast, and simple message queue for Python with **zero dependencies**.
 
 LiteQ is a pure Python message queue system built on SQLite, perfect for background task processing, job queues, and async workflows without the complexity of Redis, RabbitMQ, or Celery!
@@ -19,6 +23,7 @@ LiteQ is a pure Python message queue system built on SQLite, perfect for backgro
 **Priority Tasks** - Higher priority tasks run first  
 **Auto Retry** - Exponential backoff for failed tasks  
 **Multiple Workers** - Scale horizontally with multiple workers  
+**Long-Running Tasks** - Progress tracking, checkpoints, and cancellation support  
 **Monitoring** - Built-in queue statistics and task tracking  
 **Graceful Shutdown** - Signal handling for clean shutdowns  
 **Persistent** - SQLite-backed for reliability  
@@ -170,6 +175,51 @@ pending = get_pending_count(queue='emails')
 print(f"Pending tasks in emails queue: {pending}")
 ```
 
+### Long-Running Tasks
+
+```python
+import asyncio
+from liteq import task, QueueManager, enqueue, cancel_task
+
+@task
+async def process_large_dataset(ctx, dataset_size: int = 1000):
+    """Long-running task with progress tracking and cancellation support"""
+    
+    # Load previous progress if task was paused/resumed
+    progress = ctx.load_progress()
+    start_from = progress.get("payload", {}).get("processed", 0) if progress else 0
+    
+    results = []
+    for i in range(start_from, dataset_size):
+        # Check for cancellation
+        if ctx.cancelled:
+            ctx.save_progress(f"cancelled_at_{i}", {"processed": i})
+            return {"status": "cancelled", "processed": i}
+        
+        # Check for pause
+        if ctx.paused:
+            ctx.save_progress(f"paused_at_{i}", {"processed": i})
+            return {"status": "paused", "processed": i}
+        
+        # Process item
+        await asyncio.sleep(0.1)
+        results.append(f"result_{i}")
+        
+        # Save checkpoint every 100 items
+        if (i + 1) % 100 == 0:
+            ctx.save_progress(f"step_{i + 1}", {"processed": i + 1})
+    
+    # Save final result
+    ctx.save_result({"status": "completed", "total": len(results)})
+    return {"status": "completed", "total": len(results)}
+
+# Enqueue and manage long-running task
+task_id = enqueue("process_large_dataset", {"dataset_size": 5000})
+
+# Cancel if needed
+cancel_task(task_id)
+```
+
 ### Recovery & Cleanup
 
 ```python
@@ -180,6 +230,22 @@ recovered = recover_stuck_tasks(timeout_minutes=30)
 
 # Clean up completed/failed tasks older than 7 days
 cleaned = cleanup_old_tasks(days=7, queue='emails')
+```
+
+## More Examples
+
+Check out the [examples/](examples/) directory for complete working examples:
+
+- **[basic.py](examples/basic.py)** - Simple introduction to LiteQ with async and sync tasks
+- **[multiple_queues.py](examples/multiple_queues.py)** - Using multiple named queues with different workers
+- **[priorities.py](examples/priorities.py)** - Task priority execution order demonstration
+- **[long_running.py](examples/long_running.py)** - Long-running tasks with progress tracking, checkpoints, and cancellation
+- **[monitoring.py](examples/monitoring.py)** - Queue monitoring, statistics, and task management
+- **[email_campaign.py](examples/email_campaign.py)** - Real-world email campaign system
+
+Run any example:
+```bash
+python examples/basic.py
 ```
 
 ## API Reference
@@ -328,7 +394,6 @@ python -m twine upload dist/*
 - **Fast**: SQLite is surprisingly fast for most use cases
 - **Reliable**: Persistent storage with WAL mode
 - **Flexible**: Multiple queues, priorities, delays
-- **Production-ready**: Used in real applications
 
 ## Limitations
 
