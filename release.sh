@@ -54,8 +54,12 @@ echo -e "${GREEN}[+] Package built${NC}"
 # Commit version change if it was updated
 if [ -n "$1" ]; then
     git add pyproject.toml
-    git commit -m "Bump version to ${VERSION}"
-    echo -e "${GREEN}[+] Committed version change${NC}"
+    if git diff --cached --quiet; then
+        echo -e "${YELLOW}No changes to commit (version already updated)${NC}"
+    else
+        git commit -m "Bump version to ${VERSION}"
+        echo -e "${GREEN}[+] Committed version change${NC}"
+    fi
 fi
 
 # Create git tag
