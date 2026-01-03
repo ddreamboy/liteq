@@ -165,17 +165,16 @@ pip install liteq[web]
 liteq monitor
 
 # Or with custom options
-liteq monitor --host 0.0.0.0 --port 5555 --db tasks.db
+liteq monitor --host 0.0.0.0 --port 5151 --db tasks.db
 ```
 
-Then open your browser to: **http://127.0.0.1:5555**
+Then open your browser to: **http://127.0.0.1:5151**
 
 **Features:**
 - 📊 Real-time statistics (tasks, workers, queues)
 - 👷 Active worker monitoring with performance metrics
-- 📋 Task management (view, retry, cancel)
+- 📋 Task management (view, cancel)
 - 🔄 Auto-refresh every 5 seconds
-- 🎨 Modern, responsive UI
 - 📈 Queue analytics
 
 For more details, see [Web Monitor Documentation](docs/WEB_MONITOR.md)

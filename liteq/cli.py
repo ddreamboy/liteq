@@ -27,7 +27,7 @@ Examples:
         "--host", default="127.0.0.1", help="Host to bind to (default: 127.0.0.1)"
     )
     monitor_parser.add_argument(
-        "--port", type=int, default=5555, help="Port to bind to (default: 5555)"
+        "--port", type=int, default=5151, help="Port to bind to (default: 5151)"
     )
 
     args = parser.parse_args()
