@@ -2,9 +2,9 @@ name: Tests
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
   pull_request:
-    branches: [ main ]
+    branches: [ master ]
 
 jobs:
   test:
@@ -39,7 +39,7 @@ jobs:
         token: ${{ secrets.CODECOV_TOKEN }}
     
     - name: Generate coverage badge
-      if: matrix.python-version == '3.12' && github.ref == 'refs/heads/main'
+      if: matrix.python-version == '3.12' && github.ref == 'refs/heads/master'
       run: |
         coverage_percent=$(python -c "import xml.etree.ElementTree as ET; tree = ET.parse('coverage.xml'); root = tree.getroot(); print(root.attrib['line-rate'])")
         coverage_int=$(python -c "print(int(float($coverage_percent) * 100))")

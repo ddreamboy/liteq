@@ -63,9 +63,12 @@ echo -e "${YELLOW}Creating git tag v${VERSION}...${NC}"
 git tag -a "v${VERSION}" -m "Release version ${VERSION}"
 echo -e "${GREEN}[+] Git tag created${NC}"
 
+# Get current branch name
+BRANCH=$(git branch --show-current)
+
 # Push to GitHub
-echo -e "${YELLOW}Pushing to GitHub...${NC}"
-git push origin main
+echo -e "${YELLOW}Pushing to GitHub (branch: ${BRANCH})...${NC}"
+git push origin "${BRANCH}"
 git push origin "v${VERSION}"
 echo -e "${GREEN}[+] Pushed to GitHub${NC}"
 
