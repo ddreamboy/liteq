@@ -1,12 +1,9 @@
-"""Tests for long-running tasks functionality"""
-
 import pytest
 import asyncio
 import os
 from liteq import (
     task,
     QueueManager,
-    Worker,
     enqueue,
     cancel_task,
     pause_task,

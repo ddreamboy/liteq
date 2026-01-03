@@ -1,5 +1,3 @@
-"""Tests for recovery and retry functionality"""
-
 import pytest
 import asyncio
 import os

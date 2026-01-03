@@ -1,5 +1,3 @@
-"""Tests for watchdog functionality"""
-
 import pytest
 import asyncio
 import os
