@@ -38,7 +38,7 @@ fi
 
 # Run tests
 echo -e "${YELLOW}Running tests...${NC}"
-pytest -v
+venv/bin/python -m pytest -v
 echo -e "${GREEN}[+] Tests passed${NC}"
 
 # Clean previous builds
@@ -48,7 +48,7 @@ echo -e "${GREEN}[+] Cleaned${NC}"
 
 # Build package
 echo -e "${YELLOW}Building package...${NC}"
-python -m build
+venv/bin/python -m build
 echo -e "${GREEN}[+] Package built${NC}"
 
 # Commit version change if it was updated
@@ -76,7 +76,7 @@ echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     # Upload to PyPI
     echo -e "${YELLOW}Publishing to PyPI...${NC}"
-    python -m twine upload dist/*
+    venv/bin/python -m twine upload dist/*
     echo -e "${GREEN}[+] Published to PyPI${NC}"
     
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
