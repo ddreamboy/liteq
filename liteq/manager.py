@@ -57,7 +57,13 @@ class QueueManager:
             self._initialized = True
             logger.info(f"QueueManager initialized with database: {self.db_path}")
 
-    def add_worker(self, worker_id: str, queues: List[str] = None, poll_interval: int = 1):
+    def add_worker(
+        self,
+        worker_id: str,
+        queues: List[str] = None,
+        poll_interval: int = 1,
+        heartbeat_interval: int = None,
+    ):
         """
         Add a worker to the manager
 
@@ -65,13 +71,24 @@ class QueueManager:
             worker_id: Unique worker identifier
             queues: List of queue names this worker should process
             poll_interval: Polling interval in seconds
+            heartbeat_interval: Heartbeat update interval in seconds (optional)
 
         Returns:
             Worker instance
         """
-        worker = Worker(worker_id, queues=queues, poll_interval=poll_interval)
+        worker_kwargs = {
+            "worker_id": worker_id,
+            "queues": queues,
+            "poll_interval": poll_interval,
+        }
+        if heartbeat_interval is not None:
+            worker_kwargs["heartbeat_interval"] = heartbeat_interval
+
+        worker = Worker(**worker_kwargs)
         self.workers.append(worker)
-        logger.info(f"Added worker '{worker_id}' for queues: {queues or ['default']}")
+        logger.info(
+            f"Added worker '{worker_id}' for queues: {queues or ['default']}"
+        )
         return worker
 
     def remove_worker(self, worker_id: str):

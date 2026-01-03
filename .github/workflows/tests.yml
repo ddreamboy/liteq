@@ -1,0 +1,59 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11', '3.12']
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+    
+    - name: Run tests with coverage
+      run: |
+        pytest --cov=liteq --cov-report=xml --cov-report=term -v
+    
+    - name: Upload coverage to Codecov
+      if: matrix.python-version == '3.12'
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage.xml
+        fail_ci_if_error: false
+        token: ${{ secrets.CODECOV_TOKEN }}
+    
+    - name: Generate coverage badge
+      if: matrix.python-version == '3.12' && github.ref == 'refs/heads/main'
+      run: |
+        coverage_percent=$(python -c "import xml.etree.ElementTree as ET; tree = ET.parse('coverage.xml'); root = tree.getroot(); print(root.attrib['line-rate'])")
+        coverage_int=$(python -c "print(int(float($coverage_percent) * 100))")
+        echo "COVERAGE=$coverage_int" >> $GITHUB_ENV
+        
+        if [ $coverage_int -ge 90 ]; then
+          color="brightgreen"
+        elif [ $coverage_int -ge 75 ]; then
+          color="green"
+        elif [ $coverage_int -ge 60 ]; then
+          color="yellowgreen"
+        elif [ $coverage_int -ge 40 ]; then
+          color="yellow"
+        else
+          color="red"
+        fi
+        echo "COLOR=$color" >> $GITHUB_ENV

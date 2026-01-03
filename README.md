@@ -1,5 +1,12 @@
 # LiteQ
 
+<p align="center">
+  <a href="https://github.com/ddreamboy/liteq/actions/workflows/tests.yml"><img src="https://github.com/ddreamboy/liteq/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
+  <a href="https://codecov.io/gh/ddreamboy/liteq"><img src="https://codecov.io/gh/ddreamboy/liteq/branch/main/graph/badge.svg" alt="codecov"></a>
+  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10%2B-blue.svg" alt="Python Version"></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+</p>
+
 A lightweight, fast, and simple message queue for Python with **zero dependencies**.
 
 LiteQ is a pure Python message queue system built on SQLite, perfect for background task processing, job queues, and async workflows without the complexity of Redis, RabbitMQ, or Celery!

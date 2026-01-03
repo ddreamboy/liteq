@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "liteq"
-version = "0.1.1"
+version = "0.1.2"
 description = "A lightweight message queue for Python with no dependencies"
 readme = "README.md"
 authors = [
@@ -30,6 +30,7 @@ dependencies = []
 dev = [
     "pytest>=7.0",
     "pytest-asyncio>=0.21",
+    "pytest-cov>=4.0",
     "black>=22.0",
     "ruff>=0.1",
 ]
@@ -57,3 +58,19 @@ target-version = "py310"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.coverage.run]
+source = ["liteq"]
+omit = ["tests/*", "examples/*", "migrate.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "if typing.TYPE_CHECKING:",
+]
