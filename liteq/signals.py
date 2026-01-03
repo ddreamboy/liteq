@@ -1,5 +1,4 @@
 import signal
-import sys
 import asyncio
 import logging
 from liteq.recovery import pause_running

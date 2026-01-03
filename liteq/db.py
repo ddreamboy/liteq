@@ -40,17 +40,27 @@ def init_db():
         payload TEXT,
         queue TEXT NOT NULL DEFAULT 'default',
         status TEXT CHECK(status IN (
-            'pending', 'running', 'paused', 'done', 'failed'
+            'pending', 'running', 'paused', 'done', 'failed', 'retry'
         )) NOT NULL DEFAULT 'pending',
         run_at DATETIME NOT NULL,
+        retry_at DATETIME,
         attempts INTEGER DEFAULT 0,
         max_retries INTEGER DEFAULT 3,
+        max_attempts INTEGER DEFAULT 3,
         last_error TEXT,
+        error_message TEXT,
+        error_traceback TEXT,
         priority INTEGER DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        finished_at DATETIME,
         completed_at DATETIME,
-        worker_id TEXT
+        worker_id TEXT,
+        heartbeat_at DATETIME,
+        progress TEXT,
+        result TEXT,
+        cancel_requested BOOLEAN DEFAULT 0,
+        paused_requested BOOLEAN DEFAULT 0
     );
 
     CREATE INDEX IF NOT EXISTS idx_tasks_queue_run
@@ -64,6 +74,9 @@ def init_db():
     
     CREATE INDEX IF NOT EXISTS idx_tasks_queue
         ON tasks(queue);
+    
+    CREATE INDEX IF NOT EXISTS idx_tasks_heartbeat
+        ON tasks(status, heartbeat_at);
     """)
     conn.commit()
 

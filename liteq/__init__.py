@@ -15,8 +15,19 @@ from liteq.recovery import (
     recover_paused,
     pause_running,
     recover_stuck_tasks,
+    recover_retry_tasks,
     cleanup_old_tasks,
 )
+from liteq.control import (
+    cancel_task,
+    pause_task,
+    resume_task,
+    get_task_result,
+    get_task_status,
+    get_task_progress,
+)
+from liteq.watchdog import Watchdog, run_watchdog
+from liteq.context import TaskContext
 
 __all__ = [
     "task",
@@ -32,5 +43,15 @@ __all__ = [
     "recover_paused",
     "pause_running",
     "recover_stuck_tasks",
+    "recover_retry_tasks",
     "cleanup_old_tasks",
+    "cancel_task",
+    "pause_task",
+    "resume_task",
+    "get_task_result",
+    "get_task_status",
+    "get_task_progress",
+    "Watchdog",
+    "run_watchdog",
+    "TaskContext",
 ]

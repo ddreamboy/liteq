@@ -1,6 +1,5 @@
 import asyncio
 import logging
-from datetime import datetime
 from liteq import task, QueueManager, enqueue, enqueue_many, get_queue_stats
 
 logging.basicConfig(

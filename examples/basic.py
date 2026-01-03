@@ -27,7 +27,7 @@ def greet_sync(name: str):
 
 async def main():
     # Initialize manager
-    manager = QueueManager(db_path="basic_example.db")
+    manager = QueueManager(db_path="tasks.db")
     manager.initialize()
 
     # Add a worker

@@ -17,7 +17,8 @@ def recover_paused(queue=None):
                 """
                 UPDATE tasks
                 SET status='pending',
-                    worker_id=NULL
+                    worker_id=NULL,
+                    paused_requested=0
                 WHERE status='paused' AND queue=?
             """,
                 (queue,),
@@ -26,7 +27,8 @@ def recover_paused(queue=None):
             result = conn.execute("""
                 UPDATE tasks
                 SET status='pending',
-                    worker_id=NULL
+                    worker_id=NULL,
+                    paused_requested=0
                 WHERE status='paused'
             """)
         count = result.rowcount
@@ -71,6 +73,8 @@ def recover_stuck_tasks(timeout_minutes=30, queue=None):
     Recover tasks that have been running for too long
     (likely from crashed workers)
 
+    DEPRECATED: Use watchdog instead for heartbeat-based recovery
+
     Args:
         timeout_minutes: Minutes before a task is considered stuck
         queue: Specific queue to recover (None = all queues)
@@ -80,11 +84,15 @@ def recover_stuck_tasks(timeout_minutes=30, queue=None):
             result = conn.execute(
                 """
                 UPDATE tasks
-                SET status='pending',
-                    worker_id=NULL
+                SET status='retry',
+                    worker_id=NULL,
+                    retry_at=datetime('now', '+5 seconds')
                 WHERE status='running'
                   AND queue=?
-                  AND updated_at < datetime('now', '-{} minutes')
+                  AND (
+                    heartbeat_at IS NULL
+                    OR heartbeat_at < datetime('now', '-{} minutes')
+                  )
             """.format(timeout_minutes),
                 (queue,),
             )
@@ -92,10 +100,14 @@ def recover_stuck_tasks(timeout_minutes=30, queue=None):
             result = conn.execute(
                 """
                 UPDATE tasks
-                SET status='pending',
-                    worker_id=NULL
+                SET status='retry',
+                    worker_id=NULL,
+                    retry_at=datetime('now', '+5 seconds')
                 WHERE status='running'
-                  AND updated_at < datetime('now', '-{} minutes')
+                  AND (
+                    heartbeat_at IS NULL
+                    OR heartbeat_at < datetime('now', '-{} minutes')
+                  )
             """.format(timeout_minutes)
             )
         count = result.rowcount
@@ -103,6 +115,43 @@ def recover_stuck_tasks(timeout_minutes=30, queue=None):
     if count > 0:
         queue_info = f" in queue '{queue}'" if queue else ""
         logger.warning(f"Recovered {count} stuck tasks{queue_info}")
+
+    return count
+
+
+def recover_retry_tasks(queue=None):
+    """
+    Move retry tasks that are ready back to pending
+
+    Args:
+        queue: Specific queue to recover (None = all queues)
+    """
+    with get_db_transaction() as conn:
+        if queue:
+            result = conn.execute(
+                """
+                UPDATE tasks
+                SET status='pending',
+                    run_at=CURRENT_TIMESTAMP
+                WHERE status='retry'
+                  AND queue=?
+                  AND (retry_at IS NULL OR retry_at <= CURRENT_TIMESTAMP)
+                """,
+                (queue,),
+            )
+        else:
+            result = conn.execute("""
+                UPDATE tasks
+                SET status='pending',
+                    run_at=CURRENT_TIMESTAMP
+                WHERE status='retry'
+                  AND (retry_at IS NULL OR retry_at <= CURRENT_TIMESTAMP)
+            """)
+        count = result.rowcount
+
+    if count > 0:
+        queue_info = f" in queue '{queue}'" if queue else ""
+        logger.info(f"Moved {count} retry tasks to pending{queue_info}")
 
     return count
 

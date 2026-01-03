@@ -6,10 +6,8 @@ from liteq import (
     enqueue,
     get_queue_stats,
     get_failed_tasks,
-    retry_task,
     get_pending_count,
     recover_stuck_tasks,
-    cleanup_old_tasks,
 )
 
 logging.basicConfig(
@@ -42,9 +40,7 @@ async def monitor_queues(manager):
         # Get overall stats
         stats = get_queue_stats()
         for stat in stats:
-            logging.info(
-                f"Queue '{stat['queue']}' - {stat['status']}: {stat['count']} tasks"
-            )
+            logging.info(f"Queue '{stat['queue']}' - {stat['status']}: {stat['count']} tasks")
 
         # Get pending count
         pending = get_pending_count(queue="jobs")
@@ -55,9 +51,7 @@ async def monitor_queues(manager):
         if failed:
             logging.info(f"Failed tasks: {len(failed)}")
             for task in failed[:3]:  # Show first 3
-                logging.info(
-                    f"   Task {task['id']}: {task['name']} - Attempts: {task['attempts']}"
-                )
+                logging.info(f"   Task {task['id']}: {task['name']} - Attempts: {task['attempts']}")
 
         # Recover stuck tasks (if any)
         recovered = recover_stuck_tasks(timeout_minutes=1)

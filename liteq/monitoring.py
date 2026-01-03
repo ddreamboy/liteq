@@ -1,4 +1,3 @@
-import json
 from liteq.db import get_conn, get_db_transaction
 
 
