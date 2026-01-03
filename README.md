@@ -153,6 +153,35 @@ enqueue("cleanup_temp_files", {}, delay=3600)
 
 ### Monitoring
 
+#### Web UI (like Flower) 🚀
+
+LiteQ includes a beautiful web interface for monitoring workers and tasks in real-time:
+
+```bash
+# Install web dependencies
+pip install liteq[web]
+
+# Start the monitoring UI
+liteq monitor
+
+# Or with custom options
+liteq monitor --host 0.0.0.0 --port 5555 --db tasks.db
+```
+
+Then open your browser to: **http://127.0.0.1:5555**
+
+**Features:**
+- 📊 Real-time statistics (tasks, workers, queues)
+- 👷 Active worker monitoring with performance metrics
+- 📋 Task management (view, retry, cancel)
+- 🔄 Auto-refresh every 5 seconds
+- 🎨 Modern, responsive UI
+- 📈 Queue analytics
+
+For more details, see [Web Monitor Documentation](docs/WEB_MONITOR.md)
+
+#### Programmatic Monitoring
+
 ```python
 from liteq import get_queue_stats, get_failed_tasks, retry_task
 

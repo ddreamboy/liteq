@@ -163,3 +163,110 @@ def list_queues():
     """).fetchall()
 
     return [row["queue"] for row in queues]
+
+
+def get_active_workers():
+    """
+    Get list of active workers with their current tasks
+
+    Returns:
+        List of worker dictionaries with status information
+    """
+    conn = get_conn()
+    workers = conn.execute("""
+        SELECT 
+            worker_id,
+            COUNT(*) as active_tasks,
+            MAX(heartbeat_at) as last_heartbeat,
+            GROUP_CONCAT(DISTINCT queue) as queues
+        FROM tasks
+        WHERE status='running' AND worker_id IS NOT NULL
+        GROUP BY worker_id
+        ORDER BY worker_id
+    """).fetchall()
+
+    return [dict(row) for row in workers]
+
+
+def get_recent_tasks(limit=50, queue=None, status=None):
+    """
+    Get recent tasks
+
+    Args:
+        limit: Maximum number of tasks to return
+        queue: Specific queue name (None = all queues)
+        status: Specific status (None = all statuses)
+
+    Returns:
+        List of task dictionaries
+    """
+    conn = get_conn()
+
+    query = "SELECT * FROM tasks WHERE 1=1"
+    params = []
+
+    if queue:
+        query += " AND queue=?"
+        params.append(queue)
+
+    if status:
+        query += " AND status=?"
+        params.append(status)
+
+    query += " ORDER BY created_at DESC LIMIT ?"
+    params.append(limit)
+
+    tasks = conn.execute(query, params).fetchall()
+    return [dict(task) for task in tasks]
+
+
+def get_task_timeline(hours=24):
+    """
+    Get task completion timeline for charts
+
+    Args:
+        hours: Number of hours to look back
+
+    Returns:
+        List of hourly statistics
+    """
+    conn = get_conn()
+    timeline = conn.execute(
+        """
+        SELECT 
+            strftime('%Y-%m-%d %H:00', created_at) as hour,
+            status,
+            COUNT(*) as count
+        FROM tasks
+        WHERE created_at >= datetime('now', '-' || ? || ' hours')
+        GROUP BY hour, status
+        ORDER BY hour DESC
+    """,
+        (hours,),
+    ).fetchall()
+
+    return [dict(row) for row in timeline]
+
+
+def get_worker_performance():
+    """
+    Get performance statistics per worker
+
+    Returns:
+        List of worker performance dictionaries
+    """
+    conn = get_conn()
+    stats = conn.execute("""
+        SELECT 
+            worker_id,
+            status,
+            COUNT(*) as task_count,
+            AVG(CAST((julianday(finished_at) - julianday(updated_at)) * 86400 AS REAL)) as avg_duration_seconds,
+            MAX(finished_at) as last_task_finished
+        FROM tasks
+        WHERE worker_id IS NOT NULL
+        GROUP BY worker_id, status
+        ORDER BY worker_id, status
+    """).fetchall()
+
+    return [dict(row) for row in stats]

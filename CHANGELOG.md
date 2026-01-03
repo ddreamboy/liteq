@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Web Monitoring UI** - Flower-like web interface for monitoring workers and tasks
+  - Real-time dashboard with task statistics
+  - Active worker monitoring with performance metrics
+  - Task management (view, retry, cancel)
+  - Auto-refresh every 5 seconds
+  - Modern, responsive UI with multiple tabs
+- New monitoring functions: `get_active_workers()`, `get_recent_tasks()`, `get_task_timeline()`, `get_worker_performance()`
+- REST API endpoints for monitoring and task management
+- CLI command `liteq monitor` for easy web UI startup
+- FastAPI-based web server with Jinja2 templates
+- Complete web monitoring documentation in `docs/WEB_MONITOR.md`
+- Example scripts: `web_monitor.py` and `demo_monitor.py`
+- Optional `[web]` installation extra for web dependencies
+
 ## [0.1.2] - 2026-01-03
 
 ### Fixed

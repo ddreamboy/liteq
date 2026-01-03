@@ -248,9 +248,7 @@ async def test_heartbeat_updates():
     from liteq.db import get_conn
 
     conn = get_conn()
-    row = conn.execute(
-        "SELECT heartbeat_at, status FROM tasks WHERE id=?", (task_id,)
-    ).fetchone()
+    row = conn.execute("SELECT heartbeat_at, status FROM tasks WHERE id=?", (task_id,)).fetchone()
 
     await manager.stop()
 

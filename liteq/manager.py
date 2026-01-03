@@ -86,9 +86,7 @@ class QueueManager:
 
         worker = Worker(**worker_kwargs)
         self.workers.append(worker)
-        logger.info(
-            f"Added worker '{worker_id}' for queues: {queues or ['default']}"
-        )
+        logger.info(f"Added worker '{worker_id}' for queues: {queues or ['default']}")
         return worker
 
     def remove_worker(self, worker_id: str):

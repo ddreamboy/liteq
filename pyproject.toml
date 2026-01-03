@@ -34,6 +34,11 @@ dev = [
     "black>=22.0",
     "ruff>=0.1",
 ]
+web = [
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "jinja2>=3.1.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/ddreamboy/liteq"
@@ -41,11 +46,14 @@ Documentation = "https://github.com/ddreamboy/liteq#readme"
 Repository = "https://github.com/ddreamboy/liteq.git"
 Issues = "https://github.com/ddreamboy/liteq/issues"
 
+[project.scripts]
+liteq = "liteq.cli:main"
+
 [tool.setuptools]
 packages = ["liteq"]
 
 [tool.setuptools.package-data]
-liteq = ["py.typed"]
+liteq = ["py.typed", "templates/*.html"]
 
 [tool.black]
 line-length = 100

@@ -41,9 +41,7 @@ class Worker:
     async def start(self):
         """Start the worker"""
         self.running = True
-        logger.info(
-            f"Worker {self.worker_id} started, listening to queues: {self.queues}"
-        )
+        logger.info(f"Worker {self.worker_id} started, listening to queues: {self.queues}")
 
         while self.running:
             try:
@@ -127,9 +125,7 @@ class Worker:
 
             # Check if function accepts context
             sig = signature(func)
-            accepts_context = (
-                "ctx" in sig.parameters or "context" in sig.parameters
-            )
+            accepts_context = "ctx" in sig.parameters or "context" in sig.parameters
 
             # Start heartbeat background task
             heartbeat_task = asyncio.create_task(self._heartbeat_loop(task["id"]))
@@ -144,13 +140,9 @@ class Worker:
                 # Run synchronous function in executor
                 loop = asyncio.get_event_loop()
                 if accepts_context:
-                    result = await loop.run_in_executor(
-                        None, lambda: func(ctx=ctx, **payload)
-                    )
+                    result = await loop.run_in_executor(None, lambda: func(ctx=ctx, **payload))
                 else:
-                    result = await loop.run_in_executor(
-                        None, lambda: func(**payload)
-                    )
+                    result = await loop.run_in_executor(None, lambda: func(**payload))
 
             # Cancel heartbeat
             if heartbeat_task:
@@ -198,9 +190,7 @@ class Worker:
             with get_db_transaction() as conn:
                 # Convert Row to dict to use .get()
                 task_dict = dict(task)
-                max_attempts = task_dict.get("max_attempts") or task_dict.get(
-                    "max_retries", 3
-                )
+                max_attempts = task_dict.get("max_attempts") or task_dict.get("max_retries", 3)
 
                 if attempts >= max_attempts:
                     conn.execute(

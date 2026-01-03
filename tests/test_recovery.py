@@ -238,9 +238,7 @@ async def test_queue_specific_recovery():
 
     # Pause both
     with get_db_transaction() as conn:
-        conn.execute(
-            "UPDATE tasks SET status='paused' WHERE id IN (?, ?)", (task1, task2)
-        )
+        conn.execute("UPDATE tasks SET status='paused' WHERE id IN (?, ?)", (task1, task2))
 
     # Recover only queue1
     recover_paused(queue="queue1")

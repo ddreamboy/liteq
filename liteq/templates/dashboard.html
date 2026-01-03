@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LiteQ Monitor - Dashboard</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@500&display=swap"
+        rel="stylesheet">
+
+    <style>
+        :root {
+            /* Light Theme */
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --surface-hover: #f1f5f9;
+            --header-grad: linear-gradient(135deg, #4338ca 0%, #6d28d9 100%);
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --primary: #6366f1;
+            --accent: #8b5cf6;
+
+            --success: #10b981;
+            --error: #ef4444;
+            --warning: #f59e0b;
+            --info: #3b82f6;
+
+            --card-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        [data-theme="dark"] {
+            --bg: #0b0f1a;
+            --surface: #161b2c;
+            --surface-hover: #1e2539;
+            --header-grad: linear-gradient(135deg, #1e1b4b 0%, #2e1065 100%);
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --border: #2d364d;
+            --card-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.5);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            transition: var(--transition);
+            line-height: 1.6;
+        }
+
+        /* --- Header --- */
+        .header {
+            background: var(--header-grad);
+            color: white;
+            padding: 2.5rem 2rem 4rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 2.2rem;
+            font-weight: 800;
+            letter-spacing: -0.04em;
+            text-transform: uppercase;
+        }
+
+        .theme-toggle {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 0.6rem 1.2rem;
+            border-radius: 12px;
+            color: white;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            font-weight: 600;
+            transition: var(--transition);
+        }
+
+        .theme-toggle:hover {
+            background: rgba(255, 255, 255, 0.25);
+            transform: scale(1.05);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: -2.5rem auto 0;
+            padding: 0 2rem 4rem;
+            position: relative;
+            z-index: 10;
+        }
+
+        /* --- Stats --- */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--surface);
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: var(--card-shadow);
+            border: 1px solid var(--border);
+            transition: var(--transition);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--primary);
+        }
+
+        .stat-card h3 {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+            font-weight: 800;
+        }
+
+        .stat-card .value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 2.4rem;
+            font-weight: 700;
+        }
+
+        .stat-card.pending .value {
+            color: var(--info);
+        }
+
+        .stat-card.running .value {
+            color: var(--success);
+        }
+
+        .stat-card.failed .value {
+            color: var(--error);
+        }
+
+        .stat-card.workers .value {
+            color: var(--accent);
+        }
+
+        /* --- Tabs --- */
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            background: var(--surface);
+            padding: 0.4rem;
+            border-radius: 14px;
+            margin-bottom: 2rem;
+            border: 1px solid var(--border);
+            width: fit-content;
+        }
+
+        .tab {
+            padding: 0.7rem 1.4rem;
+            cursor: pointer;
+            border-radius: 10px;
+            transition: var(--transition);
+            font-weight: 600;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .tab.active {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+        }
+
+        /* --- Sections --- */
+        .section {
+            background: var(--surface);
+            border-radius: 20px;
+            padding: 1.8rem;
+            box-shadow: var(--card-shadow);
+            border: 1px solid var(--border);
+        }
+
+        .section h2 {
+            font-size: 1.4rem;
+            margin-bottom: 1.5rem;
+            font-weight: 800;
+            border-bottom: 2px solid var(--bg);
+            padding-bottom: 1rem;
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.4s ease;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* --- Worker/Queue Cards --- */
+        .worker-card,
+        .queue-card {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.2rem;
+            margin-bottom: 1rem;
+            transition: var(--transition);
+        }
+
+        .worker-card:hover {
+            border-color: var(--primary);
+        }
+
+        .worker-id,
+        .queue-name {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: var(--primary);
+        }
+
+        .badge {
+            padding: 0.3rem 0.8rem;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .badge.active {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--success);
+        }
+
+        .badge.inactive {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--error);
+        }
+
+        .detail-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            font-weight: 700;
+        }
+
+        .detail-value {
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        /* --- Tables --- */
+        .tasks-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0 0.5rem;
+        }
+
+        .tasks-table th {
+            padding: 1rem;
+            text-align: left;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+        }
+
+        .tasks-table td {
+            padding: 1rem;
+            background: var(--bg);
+            border-top: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+            font-size: 0.9rem;
+        }
+
+        .tasks-table td:first-child {
+            border-left: 1px solid var(--border);
+            border-radius: 10px 0 0 10px;
+        }
+
+        .tasks-table td:last-child {
+            border-right: 1px solid var(--border);
+            border-radius: 0 10px 10px 0;
+        }
+
+        .status-badge {
+            padding: 0.3rem 0.6rem;
+            border-radius: 6px;
+            font-size: 0.7rem;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .status-badge.running {
+            background: var(--success);
+            color: white;
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+        }
+
+        .status-badge.pending {
+            background: var(--info);
+            color: white;
+        }
+
+        .status-badge.failed {
+            background: var(--error);
+            color: white;
+        }
+
+        .status-badge.done {
+            background: var(--text-muted);
+            color: white;
+        }
+
+        /* --- Buttons --- */
+        .action-btn {
+            background: var(--surface);
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            padding: 0.4rem 0.8rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 0.75rem;
+            transition: var(--transition);
+        }
+
+        .action-btn:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .action-btn.danger {
+            border-color: var(--error);
+            color: var(--error);
+        }
+
+        .action-btn.danger:hover {
+            background: var(--error);
+            color: white;
+        }
+
+        .spinner {
+            border: 3px solid var(--border);
+            border-top: 3px solid var(--primary);
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 1rem auto;
+        }
+
+        @keyframes spin {
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .refresh-info {
+            text-align: center;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 2rem;
+        }
+    </style>
+</head>
+
+<body data-theme="dark">
+    <div class="header">
+        <div class="header-content">
+            <div>
+                <h1>LiteQ Monitor</h1>
+                <p style="opacity: 0.7; font-size: 0.9rem;">Real-time Dashboard</p>
+            </div>
+            <button class="theme-toggle" onclick="toggleTheme()">DARK / LIGHT</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Stats -->
+        <div class="stats-grid">
+            <div class="stat-card pending">
+                <h3>Pending</h3>
+                <div class="value" id="stat-pending">-</div>
+            </div>
+            <div class="stat-card running">
+                <h3>Running</h3>
+                <div class="value" id="stat-running">-</div>
+            </div>
+            <div class="stat-card done">
+                <h3>Completed</h3>
+                <div class="value" id="stat-done">-</div>
+            </div>
+            <div class="stat-card failed">
+                <h3>Failed</h3>
+                <div class="value" id="stat-failed">-</div>
+            </div>
+            <div class="stat-card workers">
+                <h3>Workers</h3>
+                <div class="value" id="stat-workers">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>Queues</h3>
+                <div class="value" id="stat-queues">-</div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <div class="tab active" data-tab="workers">Workers</div>
+            <div class="tab" data-tab="queues">Queues</div>
+            <div class="tab" data-tab="tasks">Tasks</div>
+            <div class="tab" data-tab="failed">Failed</div>
+        </div>
+
+        <!-- Content -->
+        <div class="tab-content active" id="tab-workers">
+            <div class="section">
+                <h2>Active Workers</h2>
+                <div id="workers-list">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-content" id="tab-queues">
+            <div class="section">
+                <h2>Task Queues</h2>
+                <div id="queues-list">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-content" id="tab-tasks">
+            <div class="section">
+                <h2>Recent Tasks</h2>
+                <div id="tasks-list">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-content" id="tab-failed">
+            <div class="section">
+                <h2>Failed Tasks</h2>
+                <div id="failed-tasks-list">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="refresh-info">
+            AUTO_REFRESH: 5s • LAST_SYNC: <span id="last-update">-</span>
+        </div>
+    </div>
+
+    <script>
+        // --- Theme Toggle Logic ---
+        function toggleTheme() {
+            const body = document.body;
+            const theme = body.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            body.setAttribute('data-theme', theme);
+            localStorage.setItem('liteq-theme', theme);
+        }
+        if (localStorage.getItem('liteq-theme')) {
+            document.body.setAttribute('data-theme', localStorage.getItem('liteq-theme'));
+        }
+
+        // --- Tab Switching Logic ---
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabName = tab.dataset.tab;
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+                document.getElementById(`tab-${tabName}`).classList.add('active');
+            });
+        });
+
+        // --- API Functions ---
+        async function fetchOverview() { const r = await fetch('/api/overview'); return await r.json(); }
+        async function fetchWorkers() { const r = await fetch('/api/workers'); return await r.json(); }
+        async function fetchQueues() { const r = await fetch('/api/queues'); return await r.json(); }
+        async function fetchTasks(limit = 50) { const r = await fetch(`/api/tasks?limit=${limit}`); return await r.json(); }
+        async function fetchFailedTasks(limit = 100) { const r = await fetch(`/api/failed-tasks?limit=${limit}`); return await r.json(); }
+        async function retryTask(id) { const r = await fetch(`/api/tasks/${id}/retry`, { method: 'POST' }); return await r.json(); }
+        async function cancelTask(id) { const r = await fetch(`/api/tasks/${id}/cancel`, { method: 'POST' }); return await r.json(); }
+
+        // --- Update Functions ---
+        function updateOverview(data) {
+            document.getElementById('stat-pending').textContent = data.total_pending || 0;
+            document.getElementById('stat-running').textContent = data.total_running || 0;
+            document.getElementById('stat-done').textContent = data.total_done || 0;
+            document.getElementById('stat-failed').textContent = data.total_failed || 0;
+            document.getElementById('stat-workers').textContent = data.active_workers || 0;
+            document.getElementById('stat-queues').textContent = data.total_queues || 0;
+        }
+
+        function updateWorkers(workers) {
+            const container = document.getElementById('workers-list');
+            if (workers.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: var(--text-muted);">No active workers</p>';
+                return;
+            }
+            container.innerHTML = workers.map(worker => {
+                const isActive = worker.active_tasks > 0;
+                return `
+                    <div class="worker-card">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:1rem;">
+                            <span class="worker-id">${worker.worker_id}</span>
+                            <span class="badge ${isActive ? 'active' : 'inactive'}">${isActive ? 'Active' : 'Idle'}</span>
+                        </div>
+                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap:1rem;">
+                            <div class="detail-item">
+                                <div class="detail-label">Active Tasks</div>
+                                <div class="detail-value">${worker.active_tasks}</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="detail-label">Queues</div>
+                                <div class="detail-value">${worker.queues.join(', ') || 'default'}</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="detail-label">Heartbeat</div>
+                                <div class="detail-value">${worker.last_heartbeat ? new Date(worker.last_heartbeat).toLocaleTimeString() : '-'}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateQueues(queues) {
+            const container = document.getElementById('queues-list');
+            if (queues.length === 0) {
+                container.innerHTML = '<p>No queues</p>';
+                return;
+            }
+            container.innerHTML = queues.map(q => `
+                <div class="queue-card">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
+                        <span class="queue-name">${q.name}</span>
+                        <span class="badge active">Total: ${q.total}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updateTasks(tasks) {
+            const container = document.getElementById('tasks-list');
+            if (tasks.length === 0) { container.innerHTML = '<p>No tasks</p>'; return; }
+            container.innerHTML = `
+                <table class="tasks-table">
+                    <thead>
+                        <tr><th>ID</th><th>Name</th><th>Status</th><th>Created</th><th>Actions</th></tr>
+                    </thead>
+                    <tbody>
+                        ${tasks.map(t => `
+                            <tr>
+                                <td class="worker-id" style="font-size:0.8rem">${t.id}</td>
+                                <td style="font-weight:600">${t.name}</td>
+                                <td><span class="status-badge ${t.status}">${t.status}</span></td>
+                                <td style="color:var(--text-muted)">${new Date(t.created_at).toLocaleTimeString()}</td>
+                                <td>
+                                    ${t.status === 'failed' ? `<button class="action-btn" onclick="handleRetry(${t.id})">Retry</button>` : ''}
+                                    ${['running', 'pending'].includes(t.status) ? `<button class="action-btn danger" onclick="handleCancel(${t.id})">Kill</button>` : ''}
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        function updateFailedTasks(tasks) {
+            const container = document.getElementById('failed-tasks-list');
+            if (tasks.length === 0) { container.innerHTML = '<p>No errors</p>'; return; }
+            container.innerHTML = `
+                <table class="tasks-table">
+                    <thead>
+                        <tr><th>ID</th><th>Error</th><th>Attempts</th><th>Action</th></tr>
+                    </thead>
+                    <tbody>
+                        ${tasks.map(t => `
+                            <tr>
+                                <td class="worker-id">#${t.id}</td>
+                                <td style="color:var(--error); font-family:var(--mono); font-size:0.75rem;">${(t.error_message || t.last_error || 'Error').substring(0, 80)}...</td>
+                                <td>${t.attempts}/${t.max_attempts}</td>
+                                <td><button class="action-btn" onclick="handleRetry(${t.id})">Retry</button></td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        // --- Action Handlers ---
+        async function handleRetry(id) {
+            try { await retryTask(id); refreshData(); } catch (e) { alert('Error: ' + e.message); }
+        }
+        async function handleCancel(id) {
+            if (confirm('Kill task?')) {
+                try { await cancelTask(id); refreshData(); } catch (e) { alert('Error: ' + e.message); }
+            }
+        }
+
+        // --- Refresh Loop ---
+        async function refreshData() {
+            try {
+                const [overview, workers, queues, tasks, failedTasks] = await Promise.all([
+                    fetchOverview(), fetchWorkers(), fetchQueues(), fetchTasks(), fetchFailedTasks()
+                ]);
+                updateOverview(overview);
+                updateWorkers(workers);
+                updateQueues(queues);
+                updateTasks(tasks);
+                updateFailedTasks(failedTasks);
+                document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
+            } catch (error) {
+                console.error('Refresh error:', error);
+            }
+        }
+
+        refreshData();
+        setInterval(refreshData, 5000);
+    </script>
+</body>
+
+</html>

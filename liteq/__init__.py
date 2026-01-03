@@ -1,4 +1,4 @@
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 from liteq.decorators import task
 from liteq.worker import Worker
@@ -10,6 +10,11 @@ from liteq.monitoring import (
     get_failed_tasks,
     retry_task,
     get_pending_count,
+    list_queues,
+    get_active_workers,
+    get_recent_tasks,
+    get_task_timeline,
+    get_worker_performance,
 )
 from liteq.recovery import (
     recover_paused,
@@ -40,6 +45,11 @@ __all__ = [
     "get_failed_tasks",
     "retry_task",
     "get_pending_count",
+    "list_queues",
+    "get_active_workers",
+    "get_recent_tasks",
+    "get_task_timeline",
+    "get_worker_performance",
     "recover_paused",
     "pause_running",
     "recover_stuck_tasks",

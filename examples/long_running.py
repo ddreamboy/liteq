@@ -25,9 +25,7 @@ async def process_large_dataset(ctx, dataset_size: int = 1000):
     - Cooperative cancellation
     - Result storage
     """
-    logging.info(
-        f"[Task {ctx.task_id}] Starting processing of {dataset_size} items"
-    )
+    logging.info(f"[Task {ctx.task_id}] Starting processing of {dataset_size} items")
 
     # Check for previous progress
     progress = ctx.load_progress()
@@ -42,20 +40,14 @@ async def process_large_dataset(ctx, dataset_size: int = 1000):
     for i in range(start_from, dataset_size):
         # Check for cancellation
         if ctx.cancelled:
-            logging.info(
-                f"[Task {ctx.task_id}] Cancellation requested, stopping at {i}"
-            )
-            ctx.save_progress(
-                f"cancelled_at_{i}", {"processed": i, "results": results}
-            )
+            logging.info(f"[Task {ctx.task_id}] Cancellation requested, stopping at {i}")
+            ctx.save_progress(f"cancelled_at_{i}", {"processed": i, "results": results})
             return {"status": "cancelled", "processed": i}
 
         # Check for pause
         if ctx.paused:
             logging.info(f"[Task {ctx.task_id}] Pause requested, stopping at {i}")
-            ctx.save_progress(
-                f"paused_at_{i}", {"processed": i, "results": results}
-            )
+            ctx.save_progress(f"paused_at_{i}", {"processed": i, "results": results})
             return {"status": "paused", "processed": i}
 
         # Simulate processing
@@ -64,12 +56,8 @@ async def process_large_dataset(ctx, dataset_size: int = 1000):
 
         # Save checkpoint every 100 items
         if (i + 1) % 100 == 0:
-            ctx.save_progress(
-                f"step_{i + 1}", {"processed": i + 1, "total": dataset_size}
-            )
-            logging.info(
-                f"[Task {ctx.task_id}] Checkpoint: {i + 1}/{dataset_size} items processed"
-            )
+            ctx.save_progress(f"step_{i + 1}", {"processed": i + 1, "total": dataset_size})
+            logging.info(f"[Task {ctx.task_id}] Checkpoint: {i + 1}/{dataset_size} items processed")
 
         # Heartbeat is updated automatically by worker in background
 
@@ -161,9 +149,7 @@ async def demo_long_running_tasks():
     manager.add_worker("worker-1", queues=["default"])
 
     # Enqueue long-running tasks
-    task1_id = enqueue(
-        "process_large_dataset", {"dataset_size": 500}, max_attempts=5
-    )
+    task1_id = enqueue("process_large_dataset", {"dataset_size": 500}, max_attempts=5)
     task2_id = enqueue("compute_pi", {"iterations": 5000000}, max_attempts=3)
 
     logging.info(f"\nEnqueued tasks: {task1_id}, {task2_id}")
@@ -172,9 +158,7 @@ async def demo_long_running_tasks():
         f"\tpython -c 'from liteq import get_task_progress; logging.info(get_task_progress({task1_id}))'"
     )
     logging.info("\nTo cancel a task, run:")
-    logging.info(
-        f"\tpython -c 'from liteq import cancel_task; cancel_task({task1_id})'"
-    )
+    logging.info(f"\tpython -c 'from liteq import cancel_task; cancel_task({task1_id})'")
 
     try:
         await asyncio.wait_for(manager.start(), timeout=60)
@@ -192,9 +176,7 @@ async def demo_long_running_tasks():
             if status:
                 logging.info(f"\nTask {task_id}:")
                 logging.info(f"  Status: {status['status']}")
-                logging.info(
-                    f"  Attempts: {status['attempts']}/{status['max_attempts']}"
-                )
+                logging.info(f"  Attempts: {status['attempts']}/{status['max_attempts']}")
                 if status.get("progress"):
                     logging.info(f"  Progress: {status['progress']}")
                 if status.get("result"):
@@ -247,9 +229,7 @@ if __name__ == "__main__":
     """)
 
     choice = (
-        input(
-            "\nChoose demo:\n1. Long-running tasks\n2. Cancellation demo\n\nChoice [1]: "
-        ).strip()
+        input("\nChoose demo:\n1. Long-running tasks\n2. Cancellation demo\n\nChoice [1]: ").strip()
         or "1"
     )
 
