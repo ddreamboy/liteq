@@ -1,10 +1,13 @@
 import asyncio
 import logging
-from liteq import task, QueueManager, enqueue, enqueue_many, get_queue_stats
+
+from liteq import task
+from liteq.db import init_db
+from liteq.monitoring import get_queue_stats
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    format="%(asctime)s - %(levelname)s - %(message)s",
 )
 
 # Simulated database of users
@@ -29,9 +32,12 @@ async def send_campaign_email(user_id: int, campaign_id: int):
     if not user:
         raise ValueError(f"User {user_id} not found")
 
-    logging.info(f"Sending campaign {campaign_id} to {user['name']} ({user['email']})")
+    logging.info(
+        f"Sending campaign {campaign_id} to {user['name']} ({user['email']})"
+    )
     await asyncio.sleep(0.3)  # Simulate email sending
     logging.info(f"Email sent to {user['name']}")
+    return {"user_id": user_id, "campaign_id": campaign_id, "status": "sent"}
 
 
 @task(queue="analytics", max_retries=2)
@@ -39,6 +45,7 @@ async def track_email_open(user_id: int, campaign_id: int):
     """Track email open event"""
     logging.info(f"Tracking email open: user={user_id}, campaign={campaign_id}")
     await asyncio.sleep(0.1)
+    return {"event": "open", "user_id": user_id, "campaign_id": campaign_id}
 
 
 @task(queue="analytics", max_retries=2)
@@ -46,6 +53,12 @@ async def track_email_click(user_id: int, campaign_id: int, link: str):
     """Track email link click"""
     logging.info(f"Tracking click: user={user_id}, link={link}")
     await asyncio.sleep(0.1)
+    return {
+        "event": "click",
+        "user_id": user_id,
+        "campaign_id": campaign_id,
+        "link": link,
+    }
 
 
 @task(queue="reports", max_retries=5)
@@ -54,50 +67,64 @@ async def generate_campaign_report(campaign_id: int):
     logging.info(f"Generating report for campaign {campaign_id}")
     await asyncio.sleep(2)
     logging.info(f"Report generated for campaign {campaign_id}")
+    return {"campaign_id": campaign_id, "status": "completed"}
 
 
-async def launch_campaign(campaign_id: int, priority_tier: dict):
+def launch_campaign(campaign_id: int):
     """Launch an email campaign"""
     logging.info(f"Launching campaign {campaign_id}...")
 
-    # Prepare email tasks with priority based on user tier
-    email_tasks = []
+    task_ids = []
+
+    # Send emails to all users
     for user in USERS:
-        priority = priority_tier.get(user["tier"], 1)
-        email_tasks.append(
-            {
-                "task_name": "send_campaign_email",
-                "payload": {"user_id": user["id"], "campaign_id": campaign_id},
-                "queue": "emails",
-                "priority": priority,
-            }
+        task_id = send_campaign_email.delay(
+            user_id=user["id"], campaign_id=campaign_id
         )
+        task_ids.append(task_id)
+        logging.info(f"Enqueued email for {user['name']}: {task_id}")
 
-    # Batch enqueue all emails
-    task_ids = enqueue_many(email_tasks)
-    logging.info(f"Enqueued {len(task_ids)} emails")
-
-    # Schedule report generation (delayed by 10 seconds to wait for emails)
-    enqueue(
-        "generate_campaign_report",
-        {"campaign_id": campaign_id},
-        queue="reports",
-        delay=10,
+    # Schedule some tracking events
+    track_email_open.delay(user_id=1, campaign_id=campaign_id)
+    track_email_open.delay(user_id=3, campaign_id=campaign_id)
+    track_email_click.delay(
+        user_id=1, campaign_id=campaign_id, link="https://example.com/promo"
     )
+
+    # Schedule report generation
+    report_id = generate_campaign_report.delay(campaign_id=campaign_id)
+    logging.info(f"Enqueued report generation: {report_id}")
+
+    logging.info(f"\nCampaign {campaign_id} launched!")
+    logging.info(f"Enqueued {len(task_ids)} emails + analytics + report")
 
     return task_ids
 
 
-async def main():
-    manager = QueueManager(db_path="campaign_example.db")
-    manager.initialize()
+if __name__ == "__main__":
+    # Initialize database
+    init_db()
 
-    # Worker setup:
-    # - 2 workers for emails (high throughput)
-    # - 1 worker for analytics
-    # - 1 worker for reports
-    manager.add_worker("email-worker-1", queues=["emails"], poll_interval=0.5)
-    manager.add_worker("email-worker-2", queues=["emails"], poll_interval=0.5)
+    # Launch campaign
+    campaign_id = 2024
+    task_ids = launch_campaign(campaign_id)
+
+    # Show queue stats
+    stats = get_queue_stats()
+    logging.info("\nQueue Statistics:")
+    for stat in stats:
+        logging.info(f"   {stat['queue']}/{stat['status']}: {stat['count']}")
+
+    logging.info("\nTo process campaign, run workers:")
+    logging.info(
+        "  Terminal 1: liteq worker --app examples/email_campaign.py --queues emails --concurrency 2"
+    )
+    logging.info(
+        "  Terminal 2: liteq worker --app examples/email_campaign.py --queues analytics"
+    )
+    logging.info(
+        "  Terminal 3: liteq worker --app examples/email_campaign.py --queues reports"
+    )
     manager.add_worker("analytics-worker", queues=["analytics"])
     manager.add_worker("report-worker", queues=["reports"])
 

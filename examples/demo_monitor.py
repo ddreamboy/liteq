@@ -1,14 +1,20 @@
 import asyncio
-import time
+import logging
 import random
-from liteq import task, QueueManager, enqueue
-from liteq.web import run_monitor
-import threading
+import time
+
+from liteq import task
+from liteq.db import init_db
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
 
 
 @task(queue="emails", max_retries=3)
 def send_email(email: str, subject: str):
-    print(f"Sending email to {email}: {subject}")
+    logging.info(f"Sending email to {email}: {subject}")
     time.sleep(random.uniform(1, 3))
     if random.random() < 0.1:
         raise ValueError(f"Failed to send email to {email}")
@@ -17,8 +23,8 @@ def send_email(email: str, subject: str):
 
 @task(queue="processing", max_retries=1)
 async def process_data(data_id: int):
-    print(f"Processing data {data_id}")
-    await asyncio.sleep(random.uniform(30, 120))
+    logging.info(f"Processing data {data_id}")
+    await asyncio.sleep(random.uniform(2, 5))
     if random.random() < 0.15:
         raise RuntimeError(f"Failed to process data {data_id}")
     return f"Data {data_id} processed successfully"
@@ -26,80 +32,68 @@ async def process_data(data_id: int):
 
 @task(queue="notifications", max_retries=2)
 def send_notification(user_id: int, message: str):
-    print(f"Notification to user {user_id}: {message}")
+    logging.info(f"Notification to user {user_id}: {message}")
     time.sleep(random.uniform(0.5, 1.5))
     return f"Notification sent to user {user_id}"
 
 
 async def generate_continuous_tasks():
+    """Generate tasks continuously"""
     task_counter = 0
 
-    while True:
-        num_tasks = random.randint(3, 5)
+    logging.info("Starting task generation...")
 
-        for _ in range(num_tasks):
-            task_type = random.choice(["email", "data", "notification"])
+    try:
+        while True:
+            num_tasks = random.randint(3, 5)
 
-            if task_type == "email":
-                enqueue(
-                    "send_email",
-                    {
-                        "email": f"user{task_counter}@example.com",
-                        "subject": f"Test Email {task_counter}",
-                    },
-                    queue="emails",
-                    priority=random.randint(1, 10),
-                )
-            elif task_type == "data":
-                enqueue(
-                    "process_data",
-                    {"data_id": task_counter},
-                    queue="processing",
-                    priority=random.randint(1, 20),
-                )
-            else:
-                enqueue(
-                    "send_notification",
-                    {
-                        "user_id": task_counter,
-                        "message": f"Hello from task {task_counter}",
-                    },
-                    queue="notifications",
-                )
+            for _ in range(num_tasks):
+                task_type = random.choice(["email", "data", "notification"])
 
-            task_counter += 1
+                if task_type == "email":
+                    send_email.delay(
+                        email=f"user{task_counter}@example.com",
+                        subject=f"Test Email {task_counter}",
+                    )
+                elif task_type == "data":
+                    process_data.delay(data_id=task_counter)
+                else:
+                    send_notification.delay(
+                        user_id=task_counter,
+                        message=f"Hello from task {task_counter}",
+                    )
 
-        print(f"Generated {num_tasks} tasks (total: {task_counter})")
+                task_counter += 1
 
-        await asyncio.sleep(random.uniform(5, 10))
+            logging.info(f"Generated {num_tasks} tasks (total: {task_counter})")
+
+            await asyncio.sleep(random.uniform(5, 10))
+
+    except KeyboardInterrupt:
+        logging.info(f"\nStopped. Total tasks generated: {task_counter}")
 
 
-async def run_workers():
-    manager = QueueManager(db_path="demo_tasks.db")
-    manager.initialize()
+if __name__ == "__main__":
+    # Initialize database
+    init_db()
 
-    manager.add_worker("worker-emails", queues=["emails"])
-    manager.add_worker("worker-processing", queues=["processing"])
-    manager.add_worker("worker-notifications", queues=["notifications"])
-    manager.add_worker("worker-all", queues=["emails", "processing", "notifications"])
+    logging.info("""
+╔══════════════════════════════════════════════════════════════╗
+║         LiteQ Demo Monitor                                   ║
+║                                                              ║
+║  This demo generates random tasks continuously               ║
+║                                                              ║
+║  To use:                                                     ║
+║  1. Run workers: liteq worker --app examples/demo_monitor.py --queues emails,processing,notifications --concurrency 4
+║  2. Run this script to generate tasks                        ║
+║  3. Open monitor: liteq monitor (in another terminal)        ║
+║  4. Open http://127.0.0.1:5151 in browser                    ║
+╚══════════════════════════════════════════════════════════════╝
+    """)
 
-    print("Starting workers...")
-    await manager.start()
+    input("Press Enter to start generating tasks...")
 
-
-def start_monitor_thread():
-    print("\nOpen your browser to: http://127.0.0.1:5151")
-
-    thread = threading.Thread(
-        target=run_monitor,
-        kwargs={"db_path": "demo_tasks.db", "host": "127.0.0.1", "port": 5151},
-        daemon=True,
-    )
-    thread.start()
-    return thread
-
-
-async def main():
+    asyncio.run(generate_continuous_tasks())
     start_monitor_thread()
 
     await asyncio.sleep(2)

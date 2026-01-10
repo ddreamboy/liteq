@@ -1,10 +1,13 @@
 import asyncio
 import logging
-from liteq import task, QueueManager, enqueue, enqueue_many
+import time
+
+from liteq import task
+from liteq.db import init_db
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    format="%(asctime)s - %(levelname)s - %(message)s",
 )
 
 
@@ -28,8 +31,6 @@ async def generate_report(report_id: int, report_type: str):
 def send_sms(phone: str, message: str):
     """Send SMS notification (simulated, sync)"""
     logging.info(f"SMS to {phone}: {message}")
-    import time
-
     time.sleep(0.5)
     logging.info(f"SMS sent to {phone}")
 
@@ -42,87 +43,60 @@ async def cleanup_temp_files(older_than_days: int):
     logging.info("Cleanup completed")
 
 
-async def main():
-    manager = QueueManager(db_path="multi_queue_example.db")
-    manager.initialize()
+if __name__ == "__main__":
+    # Initialize database
+    init_db()
 
-    # Worker 1: handles emails and notifications
-    manager.add_worker("email-worker", queues=["emails", "notifications"])
-
-    # Worker 2: dedicated to reports (CPU intensive)
-    manager.add_worker("report-worker", queues=["reports"])
-
-    # Worker 3: handles cleanup and low-priority tasks
-    manager.add_worker("cleanup-worker", queues=["cleanup"])
-
-    # Enqueue tasks to different queues
-    logging.info("Enqueueing tasks...")
+    logging.info("Enqueueing tasks to different queues...")
 
     # Email tasks
-    enqueue(
-        "send_email",
-        {
-            "to": "user@example.com",
-            "subject": "Welcome!",
-            "body": "Thanks for signing up",
-        },
-        queue="emails",
-        priority=10,
+    email1 = send_email.delay(
+        to="user@example.com", subject="Welcome!", body="Thanks for signing up"
     )
-
-    enqueue(
-        "send_email",
-        {"to": "admin@example.com", "subject": "Alert", "body": "System update"},
-        queue="emails",
-        priority=100,
-    )  # Higher priority
+    email2 = send_email.delay(
+        to="admin@example.com", subject="Alert", body="System update"
+    )
+    email3 = send_email.delay(
+        to="vip@example.com", subject="VIP Update", body="Exclusive content"
+    )
 
     # Report tasks
-    enqueue(
-        "generate_report",
-        {"report_id": 123, "report_type": "sales"},
-        queue="reports",
-        priority=5,
-    )
-
-    enqueue(
-        "generate_report",
-        {"report_id": 124, "report_type": "analytics"},
-        queue="reports",
-        priority=3,
-    )
+    report1 = generate_report.delay(report_id=123, report_type="Sales")
+    report2 = generate_report.delay(report_id=456, report_type="Analytics")
 
     # Notification tasks
-    enqueue(
-        "send_sms",
-        {"phone": "+1234567890", "message": "Your code is 1234"},
-        queue="notifications",
-    )
+    sms1 = send_sms.delay(phone="+1234567890", message="Your code is 1234")
+    sms2 = send_sms.delay(phone="+9876543210", message="Order confirmed")
 
-    # Cleanup task (delayed by 5 seconds)
-    enqueue("cleanup_temp_files", {"older_than_days": 30}, queue="cleanup", delay=5)
+    # Cleanup task
+    cleanup1 = cleanup_temp_files.delay(older_than_days=30)
 
-    # Batch enqueue
-    email_batch = [
-        {
-            "task_name": "send_email",
-            "payload": {"to": f"user{i}@example.com", "subject": "Newsletter"},
-            "queue": "emails",
-            "priority": 1,
-        }
-        for i in range(1, 6)
-    ]
-    enqueue_many(email_batch)
+    logging.info(f"\nEnqueued {9} tasks across 4 queues")
+    logging.info(f"  - emails: {email1}, {email2}, {email3}")
+    logging.info(f"  - reports: {report1}, {report2}")
+    logging.info(f"  - notifications: {sms1}, {sms2}")
+    logging.info(f"  - cleanup: {cleanup1}")
 
-    logging.info(f"Enqueued {len(email_batch) + 6} tasks")
+    # Show queue statistics
+    from liteq.monitoring import get_queue_stats, list_queues
 
-    # Show stats
-    from liteq import get_queue_stats
-
+    queues = list_queues()
     stats = get_queue_stats()
-    logging.info("Queue Statistics:")
+
+    logging.info("\nQueue Statistics:")
     for stat in stats:
         logging.info(f"   {stat['queue']}: {stat['count']} {stat['status']} tasks")
+
+    logging.info("\nTo process these tasks, run multiple workers:")
+    logging.info(
+        "  Terminal 1: liteq worker --app examples/multiple_queues.py --queues emails,notifications"
+    )
+    logging.info(
+        "  Terminal 2: liteq worker --app examples/multiple_queues.py --queues reports"
+    )
+    logging.info(
+        "  Terminal 3: liteq worker --app examples/multiple_queues.py --queues cleanup"
+    )
 
     # Start processing (press Ctrl+C to stop)
     await manager.start()

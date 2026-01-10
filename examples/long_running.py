@@ -1,102 +1,105 @@
 import asyncio
 import logging
-from liteq import (
-    task,
-    QueueManager,
-    enqueue,
-    cancel_task,
-    get_task_status,
-)
+from liteq import task
+from liteq.db import init_db
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    format="%(asctime)s - %(levelname)s - %(message)s",
 )
 
 
-@task
-async def process_large_dataset(ctx, dataset_size: int = 1000):
+@task(max_retries=3)
+async def process_large_dataset(dataset_size: int = 1000):
     """
     Long-running task that processes a large dataset
-
-    Features:
-    - Periodic progress checkpoints
-    - Heartbeat handled automatically by worker
-    - Cooperative cancellation
-    - Result storage
     """
-    logging.info(f"[Task {ctx.task_id}] Starting processing of {dataset_size} items")
-
-    # Check for previous progress
-    progress = ctx.load_progress()
-    if progress:
-        start_from = progress.get("payload", {}).get("processed", 0)
-        logging.info(f"[Task {ctx.task_id}] Resuming from item {start_from}")
-    else:
-        start_from = 0
+    logging.info(f"Starting processing of {dataset_size} items")
 
     results = []
-
-    for i in range(start_from, dataset_size):
-        # Check for cancellation
-        if ctx.cancelled:
-            logging.info(f"[Task {ctx.task_id}] Cancellation requested, stopping at {i}")
-            ctx.save_progress(f"cancelled_at_{i}", {"processed": i, "results": results})
-            return {"status": "cancelled", "processed": i}
-
-        # Check for pause
-        if ctx.paused:
-            logging.info(f"[Task {ctx.task_id}] Pause requested, stopping at {i}")
-            ctx.save_progress(f"paused_at_{i}", {"processed": i, "results": results})
-            return {"status": "paused", "processed": i}
-
+    for i in range(dataset_size):
         # Simulate processing
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.01)
         results.append(f"result_{i}")
 
-        # Save checkpoint every 100 items
+        # Log progress every 100 items
         if (i + 1) % 100 == 0:
-            ctx.save_progress(f"step_{i + 1}", {"processed": i + 1, "total": dataset_size})
-            logging.info(f"[Task {ctx.task_id}] Checkpoint: {i + 1}/{dataset_size} items processed")
+            logging.info(f"Progress: {i + 1}/{dataset_size} items processed")
 
-        # Heartbeat is updated automatically by worker in background
-
-    # Save final result
-    final_result = {
+    logging.info(f"Processing completed! Processed {len(results)} items")
+    
+    return {
         "status": "completed",
         "total_processed": dataset_size,
         "results_count": len(results),
     }
 
-    ctx.save_result(final_result)
-    logging.info(f"[Task {ctx.task_id}] Processing completed!")
 
-    return final_result
-
-
-@task
-async def compute_pi(ctx, iterations: int = 10000000):
+@task(max_retries=3)
+async def compute_heavy_calculation(iterations: int = 1000000):
     """
-    CPU-intensive long-running task with checkpoints
+    CPU-intensive long-running task
     """
-    logging.info(f"[Task {ctx.task_id}] Computing Pi with {iterations} iterations")
+    logging.info(f"Computing with {iterations} iterations")
 
-    # Check for previous progress
-    progress = ctx.load_progress()
-    if progress:
-        start = progress.get("payload", {}).get("current_iteration", 0)
-        inside = progress.get("payload", {}).get("inside_circle", 0)
-        logging.info(f"[Task {ctx.task_id}] Resuming from iteration {start}")
-    else:
-        start = 0
-        inside = 0
+    result = 0
+    for i in range(iterations):
+        result += i ** 2
+        
+        # Log progress every 100k iterations
+        if (i + 1) % 100000 == 0:
+            logging.info(f"Progress: {i + 1}/{iterations} iterations")
+    
+    logging.info(f"Computation completed! Result: {result}")
+    
+    return {
+        "status": "completed",
+        "iterations": iterations,
+        "result": result,
+    }
 
-    import random
 
-    for i in range(start, iterations):
-        if ctx.cancelled:
-            logging.info(f"[Task {ctx.task_id}] Cancelled at iteration {i}")
-            return {"status": "cancelled", "iterations": i}
+@task(max_retries=2)
+async def download_and_process(url: str, chunk_count: int = 50):
+    """
+    Simulate downloading and processing data
+    """
+    logging.info(f"Downloading from {url}")
+    
+    for i in range(chunk_count):
+        await asyncio.sleep(0.1)  # Simulate download
+        
+        if (i + 1) % 10 == 0:
+            logging.info(f"Downloaded {i + 1}/{chunk_count} chunks")
+    
+    logging.info(f"Download and processing complete for {url}")
+    
+    return {
+        "url": url,
+        "chunks": chunk_count,
+        "status": "completed",
+    }
+
+
+if __name__ == "__main__":
+    # Initialize database
+    init_db()
+
+    logging.info("Enqueueing long-running tasks...")
+
+    # Enqueue long-running tasks
+    task1 = process_large_dataset.delay(dataset_size=500)
+    logging.info(f"Enqueued dataset processing: {task1}")
+
+    task2 = compute_heavy_calculation.delay(iterations=1000000)
+    logging.info(f"Enqueued heavy calculation: {task2}")
+
+    task3 = download_and_process.delay(url="https://example.com/data", chunk_count=50)
+    logging.info(f"Enqueued download task: {task3}")
+
+    logging.info("\nTo process these tasks, run:")
+    logging.info("  liteq worker --app examples/long_running.py --concurrency 2")
+    logging.info("\nTasks will show progress in the worker logs")
 
         x = random.random()
         y = random.random()
