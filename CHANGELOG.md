@@ -5,6 +5,74 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-01-10
+
+### 🎉 Major Rewrite - Simplified API
+
+This release represents a complete architectural simplification of LiteQ, focusing on minimalism and ease of use.
+
+### Changed - BREAKING CHANGES
+- **Removed `QueueManager`** - No longer needed, use CLI or direct Worker class instead
+- **Removed `enqueue()` function** - Use `task.delay()` method instead
+- **Removed `enqueue_many()` function** - Call `.delay()` multiple times or use database functions directly
+- **Simplified task registration** - Tasks are now registered via `@task` decorator only
+- **New execution model** - Use CLI `liteq worker` or programmatic `Worker.run()`
+
+### Added
+- **`@task` decorator** with `.delay()` method - Simple, Pythonic task enqueueing
+- **CLI interface** - `liteq worker` command for running workers
+- **Improved monitoring** - Enhanced monitoring functions in `liteq.monitoring`
+- **Better documentation** - Complete rewrite of README and examples
+- **92% test coverage** - Comprehensive test suite with pytest
+- **Worker class** - Simplified `Worker(queues, concurrency)` for programmatic use
+- **Database utilities** - Direct access via `liteq.db` module
+
+### Fixed
+- Cross-platform support in release script (Windows/Unix)
+- Test isolation issues with shared database
+- CLI worker import and execution
+- Documentation accuracy
+
+### Migration Guide from 0.1.x to 0.2.0
+
+**Before (0.1.x):**
+```python
+from liteq import task, QueueManager, enqueue
+
+@task(queue="emails")
+async def send_email(to: str):
+    ...
+
+manager = QueueManager()
+manager.initialize()
+manager.add_worker("worker-1", queues=["emails"])
+
+enqueue("send_email", {"to": "user@example.com"})
+await manager.start()
+```
+
+**After (0.2.0):**
+```python
+from liteq import task
+from liteq.db import init_db
+from liteq.worker import Worker
+
+@task(queue="emails")
+async def send_email(to: str):
+    ...
+
+# Enqueue tasks
+init_db()
+send_email.delay(to="user@example.com")
+
+# Run worker via CLI
+# $ liteq worker --app tasks.py --queues emails
+
+# Or programmatically
+worker = Worker(queues=["emails"], concurrency=4)
+worker.run()
+```
+
 ## [0.1.3] - 2026-01-03
 
 ### Added
