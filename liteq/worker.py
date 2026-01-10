@@ -1,249 +1,92 @@
 import asyncio
+import inspect
 import json
-import traceback
-import logging
-from inspect import iscoroutinefunction, signature
-from typing import List
-from liteq.db import get_conn, get_db_transaction
-from liteq.registry import get_task
-from liteq.context import TaskContext
+import os
+import socket
+import time
+from concurrent.futures import ProcessPoolExecutor
 
-POLL_INTERVAL = 1
-HEARTBEAT_INTERVAL = 10  # seconds
-logger = logging.getLogger(__name__)
+from .core import TASK_REGISTRY
+from .db import get_conn
+
+
+def _run_in_subprocess(t_id, t_name, t_payload):
+    fn = TASK_REGISTRY.get(t_name)
+    if not fn:
+        return
+
+    args = json.loads(t_payload)
+    worker_id = f"process-{os.getpid()}"
+
+    try:
+        if inspect.iscoroutinefunction(fn):
+            res = asyncio.run(fn(*args["args"], **args["kwargs"]))
+        else:
+            res = fn(*args["args"], **args["kwargs"])
+
+        with get_conn() as conn:
+            conn.execute(
+                "UPDATE tasks SET status='done', result=?, finished_at=CURRENT_TIMESTAMP, worker_id=? WHERE id=?",
+                (json.dumps(res), worker_id, t_id),
+            )
+    except Exception as e:
+        with get_conn() as conn:
+            conn.execute(
+                "UPDATE tasks SET status='failed', error=?, worker_id=? WHERE id=?",
+                (str(e), worker_id, t_id),
+            )
 
 
 class Worker:
-    def __init__(
-        self,
-        worker_id: str,
-        queues: List[str] = None,
-        poll_interval: int = POLL_INTERVAL,
-        heartbeat_interval: int = HEARTBEAT_INTERVAL,
-    ):
-        """
-        Create a worker instance
+    def __init__(self, queues, concurrency):
+        self.queues = [q.strip() for q in queues]
+        self.concurrency = concurrency
+        self.pool = ProcessPoolExecutor(max_workers=concurrency)
+        self.worker_id = f"{socket.gethostname()}-{os.getpid()}"
 
-        Args:
-            worker_id: Unique identifier for this worker
-            queues: List of queue names to process (default: ['default'])
-            poll_interval: Polling interval in seconds
-            heartbeat_interval: Heartbeat update interval in seconds
-        """
-        self.worker_id = worker_id
-        self.queues = queues or ["default"]
-        self.poll_interval = poll_interval
-        self.heartbeat_interval = heartbeat_interval
-        self.running = False
-        self._shutdown_requested = False
-        self._current_task_id = None
-
-    async def start(self):
-        """Start the worker"""
-        self.running = True
-        logger.info(f"Worker {self.worker_id} started, listening to queues: {self.queues}")
-
-        while self.running:
-            try:
-                await self._process_next_task()
-            except Exception as e:
-                logger.error(f"Worker error: {e}", exc_info=True)
-                await asyncio.sleep(self.poll_interval)
-
-    async def stop(self):
-        """Gracefully stop the worker"""
-        logger.info(f"Worker {self.worker_id} stopping...")
-        self._shutdown_requested = True
-        self.running = False
-
-    async def _process_next_task(self):
-        """Process the next available task from assigned queues"""
-        # Don't accept new tasks if shutdown requested
-        if self._shutdown_requested:
-            await asyncio.sleep(self.poll_interval)
-            return
-
-        conn = get_conn()
-
-        # Build queue filter
-        queue_placeholders = ",".join("?" * len(self.queues))
-
-        # First, try to get pending or retry tasks that are ready
-        task = conn.execute(
-            f"""
-            SELECT * FROM tasks
-            WHERE status IN ('pending', 'retry')
-              AND queue IN ({queue_placeholders})
-              AND run_at <= CURRENT_TIMESTAMP
-              AND (retry_at IS NULL OR retry_at <= CURRENT_TIMESTAMP)
-            ORDER BY priority DESC, id ASC
-            LIMIT 1
-        """,
-            self.queues,
-        ).fetchone()
-
-        if not task:
-            await asyncio.sleep(self.poll_interval)
-            return
-
-        # Atomic task claim
-        with get_db_transaction() as conn:
-            updated = conn.execute(
+    def _heartbeat(self):
+        with get_conn() as conn:
+            conn.execute(
                 """
-                UPDATE tasks
-                SET status='running',
-                    worker_id=?,
-                    heartbeat_at=CURRENT_TIMESTAMP,
-                    updated_at=CURRENT_TIMESTAMP
-                WHERE id=? AND status IN ('pending', 'retry')
+                INSERT INTO workers (worker_id, hostname, queues, concurrency, last_heartbeat)
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(worker_id) DO UPDATE SET last_heartbeat=CURRENT_TIMESTAMP
             """,
-                (self.worker_id, task["id"]),
-            ).rowcount
-
-        if updated == 0:
-            # Task already claimed by another worker
-            return
-
-        self._current_task_id = task["id"]
-        await self._execute_task(task)
-        self._current_task_id = None
-
-    async def _execute_task(self, task):
-        """Execute a single task"""
-        conn = get_conn()
-        heartbeat_task = None
-
-        try:
-            func = get_task(task["name"])
-            if func is None:
-                raise ValueError(f"Task '{task['name']}' not found in registry")
-
-            payload = json.loads(task["payload"])
-
-            # Create task context
-            ctx = TaskContext(task["id"], dict(task))
-
-            # Check if function accepts context
-            sig = signature(func)
-            accepts_context = "ctx" in sig.parameters or "context" in sig.parameters
-
-            # Start heartbeat background task
-            heartbeat_task = asyncio.create_task(self._heartbeat_loop(task["id"]))
-
-            # Support for synchronous and asynchronous tasks
-            if iscoroutinefunction(func):
-                if accepts_context:
-                    result = await func(ctx=ctx, **payload)
-                else:
-                    result = await func(**payload)
-            else:
-                # Run synchronous function in executor
-                loop = asyncio.get_event_loop()
-                if accepts_context:
-                    result = await loop.run_in_executor(None, lambda: func(ctx=ctx, **payload))
-                else:
-                    result = await loop.run_in_executor(None, lambda: func(**payload))
-
-            # Cancel heartbeat
-            if heartbeat_task:
-                heartbeat_task.cancel()
-                try:
-                    await heartbeat_task
-                except asyncio.CancelledError:
-                    pass
-
-            with get_db_transaction() as conn:
-                conn.execute(
-                    """
-                    UPDATE tasks
-                    SET status='done',
-                        result=?,
-                        updated_at=CURRENT_TIMESTAMP,
-                        finished_at=CURRENT_TIMESTAMP,
-                        completed_at=CURRENT_TIMESTAMP
-                    WHERE id=?
-                """,
-                    (
-                        json.dumps(result) if result is not None else None,
-                        task["id"],
-                    ),
-                )
-
-            logger.info(
-                f"Task {task['id']} ({task['name']}) from queue '{task['queue']}' completed successfully"
+                (
+                    self.worker_id,
+                    socket.gethostname(),
+                    ",".join(self.queues),
+                    self.concurrency,
+                ),
             )
 
-        except Exception as e:
-            # Cancel heartbeat
-            if heartbeat_task:
-                heartbeat_task.cancel()
-                try:
-                    await heartbeat_task
-                except asyncio.CancelledError:
-                    pass
-
-            attempts = task["attempts"] + 1
-            tb = traceback.format_exc()
-            error_msg = str(e)
-            logger.error(f"Task {task['id']} failed (attempt {attempts}): {e}")
-
-            with get_db_transaction() as conn:
-                # Convert Row to dict to use .get()
-                task_dict = dict(task)
-                max_attempts = task_dict.get("max_attempts") or task_dict.get("max_retries", 3)
-
-                if attempts >= max_attempts:
-                    conn.execute(
-                        """
-                        UPDATE tasks
-                        SET status='failed',
-                            attempts=?,
-                            last_error=?,
-                            error_message=?,
-                            error_traceback=?,
-                            updated_at=CURRENT_TIMESTAMP,
-                            finished_at=CURRENT_TIMESTAMP,
-                            completed_at=CURRENT_TIMESTAMP
-                        WHERE id=?
-                    """,
-                        (attempts, tb, error_msg, tb, task["id"]),
-                    )
-                else:
-                    # Exponential backoff: 5, 10, 20 secs
-                    delay = min(5 * (2 ** (attempts - 1)), 300)
-                    conn.execute(
-                        """
-                        UPDATE tasks
-                        SET status='retry',
-                            attempts=?,
-                            retry_at=datetime('now', '+{} seconds'),
-                            last_error=?,
-                            error_message=?,
-                            error_traceback=?,
-                            updated_at=CURRENT_TIMESTAMP
-                        WHERE id=?
-                    """.format(delay),
-                        (attempts, tb, error_msg, tb, task["id"]),
-                    )
-
-    async def _heartbeat_loop(self, task_id: int):
-        """Background task to update heartbeat periodically"""
+    def run(self):
+        print(f"[*] LiteQ Worker {self.worker_id} started.")
         try:
             while True:
-                await asyncio.sleep(self.heartbeat_interval)
+                self._heartbeat()
+                self._fetch_and_run()
+                time.sleep(0.5)
+        finally:
+            with get_conn() as conn:
+                conn.execute("DELETE FROM workers WHERE worker_id=?", (self.worker_id,))
+            print("\n[*] Worker stopped.")
 
-                with get_db_transaction() as conn:
-                    conn.execute(
-                        """
-                        UPDATE tasks
-                        SET heartbeat_at=CURRENT_TIMESTAMP,
-                            updated_at=CURRENT_TIMESTAMP
-                        WHERE id=?
-                        """,
-                        (task_id,),
-                    )
+    def _fetch_and_run(self):
+        with get_conn() as conn:
+            q_marks = ",".join(["?"] * len(self.queues))
+            row = conn.execute(
+                f"""
+                UPDATE tasks SET status='running' 
+                WHERE id = (
+                    SELECT id FROM tasks 
+                    WHERE status='pending' AND queue IN ({q_marks})
+                    AND run_at <= CURRENT_TIMESTAMP
+                    ORDER BY priority DESC, id ASC LIMIT 1
+                ) RETURNING id, name, payload
+            """,
+                self.queues,
+            ).fetchone()
 
-                logger.debug(f"Heartbeat updated for task {task_id}")
-        except asyncio.CancelledError:
-            logger.debug(f"Heartbeat loop cancelled for task {task_id}")
-            raise
+            if row:
+                self.pool.submit(_run_in_subprocess, row["id"], row["name"], row["payload"])

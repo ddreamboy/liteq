@@ -1,91 +1,46 @@
+import os
 import sqlite3
-from contextlib import contextmanager
-from threading import local
 
-DB_PATH = "tasks.db"
-
-_thread_local = local()
+DB_PATH = os.environ.get("LITEQ_DB", "liteq.db")
 
 
 def get_conn():
-    """Establishes and returns a connection to the SQLite database"""
-    if not hasattr(_thread_local, "conn"):
-        _thread_local.conn = sqlite3.connect(DB_PATH, timeout=30, check_same_thread=False)
-        _thread_local.conn.row_factory = sqlite3.Row
-        # Enable WAL mode for better concurrency
-        _thread_local.conn.execute("PRAGMA journal_mode=WAL")
-        _thread_local.conn.execute("PRAGMA busy_timeout=30000")
-    return _thread_local.conn
-
-
-@contextmanager
-def get_db_transaction():
-    """Context manager for database transactions"""
-    conn = get_conn()
-    try:
-        yield conn
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
+    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    return conn
 
 
 def init_db():
-    """Initializes the database with the required tables and indexes"""
-    conn = get_conn()
-    conn.executescript("""
-    CREATE TABLE IF NOT EXISTS tasks (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        payload TEXT,
-        queue TEXT NOT NULL DEFAULT 'default',
-        status TEXT CHECK(status IN (
-            'pending', 'running', 'paused', 'done', 'failed', 'retry'
-        )) NOT NULL DEFAULT 'pending',
-        run_at DATETIME NOT NULL,
-        retry_at DATETIME,
-        attempts INTEGER DEFAULT 0,
-        max_retries INTEGER DEFAULT 3,
-        max_attempts INTEGER DEFAULT 3,
-        last_error TEXT,
-        error_message TEXT,
-        error_traceback TEXT,
-        priority INTEGER DEFAULT 0,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        finished_at DATETIME,
-        completed_at DATETIME,
-        worker_id TEXT,
-        heartbeat_at DATETIME,
-        progress TEXT,
-        result TEXT,
-        cancel_requested BOOLEAN DEFAULT 0,
-        paused_requested BOOLEAN DEFAULT 0
-    );
+    with get_conn() as conn:
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS tasks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            payload TEXT NOT NULL,
+            queue TEXT NOT NULL,
+            status TEXT DEFAULT 'pending',
+            priority INTEGER DEFAULT 0,
+            attempts INTEGER DEFAULT 0,
+            max_retries INTEGER DEFAULT 3,
+            worker_id TEXT,
+            run_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            finished_at DATETIME,
+            result TEXT,
+            error TEXT
+        )""")
 
-    CREATE INDEX IF NOT EXISTS idx_tasks_queue_run
-        ON tasks(queue, status, run_at, priority DESC);
-    
-    CREATE INDEX IF NOT EXISTS idx_tasks_name
-        ON tasks(name);
-    
-    CREATE INDEX IF NOT EXISTS idx_tasks_status
-        ON tasks(status);
-    
-    CREATE INDEX IF NOT EXISTS idx_tasks_queue
-        ON tasks(queue);
-    
-    CREATE INDEX IF NOT EXISTS idx_tasks_heartbeat
-        ON tasks(status, heartbeat_at);
-    """)
-    conn.commit()
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS workers (
+            worker_id TEXT PRIMARY KEY,
+            hostname TEXT,
+            queues TEXT,
+            concurrency INTEGER,
+            last_heartbeat DATETIME DEFAULT CURRENT_TIMESTAMP
+        )""")
 
-
-def set_db_path(path: str):
-    """Set custom database path"""
-    global DB_PATH
-    DB_PATH = path
-    # Reset connection
-    if hasattr(_thread_local, "conn"):
-        _thread_local.conn.close()
-        delattr(_thread_local, "conn")
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_fetch ON tasks(status, queue, priority DESC, run_at)"
+        )

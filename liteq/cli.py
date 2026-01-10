@@ -1,47 +1,37 @@
 import argparse
+import os
 import sys
+
+from .db import init_db
+from .worker import Worker
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="LiteQ - Lightweight task queue system",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  liteq monitor                    # Start web monitoring UI
-  liteq monitor --port 8080        # Start on custom port
-  liteq monitor --db tasks.db      # Use specific database
-        """,
-    )
+    parser = argparse.ArgumentParser(description="LiteQ CLI")
+    subparsers = parser.add_subparsers(dest="command")
 
-    subparsers = parser.add_subparsers(dest="command", help="Commands")
+    worker_parser = subparsers.add_parser("worker")
+    worker_parser.add_argument("--app", required=True, help="Module with tasks (e.g. tasks.py)")
+    worker_parser.add_argument("--queues", default="default", help="Comma separated queues")
+    worker_parser.add_argument("--concurrency", type=int, default=4)
 
-    # Monitor command
-    monitor_parser = subparsers.add_parser("monitor", help="Start web monitoring UI")
-    monitor_parser.add_argument(
-        "--db",
-        default="tasks.db",
-        help="Path to SQLite database (default: tasks.db)",
-    )
-    monitor_parser.add_argument(
-        "--host", default="127.0.0.1", help="Host to bind to (default: 127.0.0.1)"
-    )
-    monitor_parser.add_argument(
-        "--port", type=int, default=5151, help="Port to bind to (default: 5151)"
-    )
+    monitor_parser = subparsers.add_parser("monitor")
+    monitor_parser.add_argument("--port", type=int, default=5151)
 
     args = parser.parse_args()
 
-    if args.command == "monitor":
-        from liteq.web import run_monitor
+    if args.command == "worker":
+        sys.path.append(os.getcwd())
+        module_name = args.app.replace(".py", "")
+        __import__(module_name)
 
-        run_monitor(db_path=args.db, host=args.host, port=args.port)
-    elif args.command is None:
-        parser.print_help()
-        sys.exit(1)
-    else:
-        print(f"Unknown command: {args.command}")
-        sys.exit(1)
+        init_db()
+        Worker(queues=args.queues.split(","), concurrency=args.concurrency).run()
+
+    elif args.command == "monitor":
+        from .web import run_monitor
+
+        run_monitor(port=args.port)
 
 
 if __name__ == "__main__":
