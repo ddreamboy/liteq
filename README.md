@@ -382,13 +382,38 @@ liteq/
 ```bash
 git clone https://github.com/ddreamboy/liteq.git
 cd liteq
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -e ".[dev]"
+```
+
+Or install only test dependencies:
+
+```bash
+pip install -r requirements-test.txt
 ```
 
 ### Run Tests
 
 ```bash
+# Run all tests
 pytest
+
+# With coverage
+pytest --cov=liteq --cov-report=html
+
+# Verbose output
+pytest -v
+```
+
+### Code Quality
+
+```bash
+# Format code
+black .
+
+# Lint code
+ruff check .
 ```
 
 ### Publish to PyPI

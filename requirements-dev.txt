@@ -1,0 +1,5 @@
+-r requirements-test.txt
+black>=22.0
+ruff>=0.1
+build>=1.0
+twine>=4.0
