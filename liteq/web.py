@@ -7,6 +7,7 @@ from fastapi.templating import Jinja2Templates
 
 from .db import get_conn, init_db
 from .monitoring import (
+    get_active_workers,
     get_failed_tasks,
     get_queue_stats,
     get_recent_tasks,
@@ -15,7 +16,6 @@ from .monitoring import (
 
 app = FastAPI(title="LiteQ Monitor")
 
-# Путь к шаблонам
 TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), "templates")
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
@@ -35,6 +35,7 @@ async def overview():
     total_done = sum(s["count"] for s in stats if s["status"] == "done")
 
     queues = list_queues()
+    workers_list = get_active_workers()
 
     return {
         "total_pending": total_pending,
@@ -42,7 +43,7 @@ async def overview():
         "total_failed": total_failed,
         "total_done": total_done,
         "total_queues": len(queues),
-        "active_workers": "N/A",
+        "active_workers": len(workers_list),
     }
 
 
@@ -64,7 +65,6 @@ async def queues_info():
 
 @app.post("/api/tasks/{task_id}/retry")
 async def retry(task_id: int):
-    """Сброс задачи обратно в очередь"""
     with get_conn() as conn:
         conn.execute(
             "UPDATE tasks SET status='pending', attempts=0, error=NULL, run_at=CURRENT_TIMESTAMP WHERE id=?",
@@ -75,7 +75,6 @@ async def retry(task_id: int):
 
 @app.post("/api/tasks/{task_id}/cancel")
 async def cancel(task_id: int):
-    """Убийство задачи"""
     with get_conn() as conn:
         conn.execute(
             "UPDATE tasks SET status='failed', error='Cancelled by user' WHERE id=?",

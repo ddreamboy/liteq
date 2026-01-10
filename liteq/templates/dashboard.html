@@ -1,658 +1,333 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LiteQ Monitor - Dashboard</title>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@500&display=swap"
-        rel="stylesheet">
-
+    <title>LiteQ | Modern Task Monitor</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
     <style>
         :root {
-            /* Light Theme */
-            --bg: #f8fafc;
-            --surface: #ffffff;
-            --surface-hover: #f1f5f9;
-            --header-grad: linear-gradient(135deg, #4338ca 0%, #6d28d9 100%);
-            --text-main: #0f172a;
-            --text-muted: #64748b;
-            --border: #e2e8f0;
+            --bg: #05070a;
+            --surface: #0f121a;
+            --surface-lighter: #161b26;
+            --border: #222938;
             --primary: #6366f1;
-            --accent: #8b5cf6;
-
+            --primary-glow: rgba(99, 102, 241, 0.3);
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
             --success: #10b981;
             --error: #ef4444;
             --warning: #f59e0b;
-            --info: #3b82f6;
-
-            --card-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
-            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        [data-theme="dark"] {
-            --bg: #0b0f1a;
-            --surface: #161b2c;
-            --surface-hover: #1e2539;
-            --header-grad: linear-gradient(135deg, #1e1b4b 0%, #2e1065 100%);
-            --text-main: #f1f5f9;
-            --text-muted: #94a3b8;
-            --border: #2d364d;
-            --card-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.5);
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Plus Jakarta Sans', sans-serif;
             background-color: var(--bg);
             color: var(--text-main);
-            transition: var(--transition);
-            line-height: 1.6;
+            overflow-x: hidden;
         }
 
-        /* --- Header --- */
-        .header {
-            background: var(--header-grad);
-            color: white;
-            padding: 2.5rem 2rem 4rem;
-            position: relative;
-            overflow: hidden;
+        /* Layout */
+        .app-container { display: flex; flex-direction: column; min-height: 100vh; }
+        
+        header {
+            padding: 1.5rem 2rem;
+            background: rgba(15, 18, 26, 0.8);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            position: sticky; top: 0; z-index: 100;
+            display: flex; justify-content: space-between; align-items: center;
         }
 
-        .header-content {
-            max-width: 1400px;
-            margin: 0 auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+        .logo { display: flex; align-items: center; gap: 0.75rem; font-weight: 800; font-size: 1.5rem; letter-spacing: -0.02em; }
+        .logo span { color: var(--primary); }
 
-        .header h1 {
-            font-size: 2.2rem;
-            font-weight: 800;
-            letter-spacing: -0.04em;
-            text-transform: uppercase;
-        }
+        main { padding: 2rem; max-width: 1400px; margin: 0 auto; width: 100%; }
 
-        .theme-toggle {
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            padding: 0.6rem 1.2rem;
-            border-radius: 12px;
-            color: white;
-            cursor: pointer;
-            backdrop-filter: blur(10px);
-            font-weight: 600;
-            transition: var(--transition);
-        }
-
-        .theme-toggle:hover {
-            background: rgba(255, 255, 255, 0.25);
-            transform: scale(1.05);
-        }
-
-        .container {
-            max-width: 1400px;
-            margin: -2.5rem auto 0;
-            padding: 0 2rem 4rem;
-            position: relative;
-            z-index: 10;
-        }
-
-        /* --- Stats --- */
+        /* Stats Grid */
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-            margin-bottom: 2rem;
+            gap: 1.5rem; margin-bottom: 2rem;
         }
 
         .stat-card {
             background: var(--surface);
+            border: 1px solid var(--border);
             border-radius: 16px;
             padding: 1.5rem;
-            box-shadow: var(--card-shadow);
-            border: 1px solid var(--border);
-            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
         }
 
-        .stat-card:hover {
-            transform: translateY(-4px);
-            border-color: var(--primary);
-        }
+        .stat-card h3 { font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+        .stat-card .value { font-family: 'JetBrains Mono', monospace; font-size: 2.5rem; font-weight: 700; }
+        .stat-card .icon { position: absolute; right: -10px; bottom: -10px; opacity: 0.05; transform: rotate(-15deg); }
 
-        .stat-card h3 {
-            font-size: 0.7rem;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            color: var(--text-muted);
-            margin-bottom: 0.5rem;
-            font-weight: 800;
+        /* Charts Section */
+        .charts-row {
+            display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; margin-bottom: 2rem;
         }
+        .chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 1.5rem; height: 300px; }
 
-        .stat-card .value {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 2.4rem;
-            font-weight: 700;
-        }
-
-        .stat-card.pending .value {
-            color: var(--info);
-        }
-
-        .stat-card.running .value {
-            color: var(--success);
-        }
-
-        .stat-card.failed .value {
-            color: var(--error);
-        }
-
-        .stat-card.workers .value {
-            color: var(--accent);
-        }
-
-        /* --- Tabs --- */
-        .tabs {
-            display: flex;
-            gap: 0.5rem;
-            background: var(--surface);
-            padding: 0.4rem;
-            border-radius: 14px;
-            margin-bottom: 2rem;
-            border: 1px solid var(--border);
-            width: fit-content;
-        }
-
+        /* Navigation */
+        .nav-tabs { display: flex; gap: 1rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 1px; }
         .tab {
-            padding: 0.7rem 1.4rem;
-            cursor: pointer;
-            border-radius: 10px;
-            transition: var(--transition);
-            font-weight: 600;
-            color: var(--text-muted);
-            font-size: 0.9rem;
+            padding: 0.75rem 1.5rem; cursor: pointer; color: var(--text-muted); font-weight: 600;
+            border-bottom: 2px solid transparent; transition: 0.2s;
         }
+        .tab.active { color: var(--primary); border-bottom-color: var(--primary); }
 
-        .tab.active {
-            background: var(--primary);
-            color: white;
-            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+        /* Workers & Queues */
+        .grid-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 1rem; }
+        .worker-card {
+            background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem;
+            display: flex; flex-direction: column; gap: 1rem;
         }
+        .worker-header { display: flex; justify-content: space-between; align-items: center; }
+        .status-pill { display: flex; align-items: center; gap: 0.4rem; font-size: 0.75rem; font-weight: 700; padding: 0.25rem 0.6rem; border-radius: 20px; }
+        .status-pill.online { background: rgba(16, 185, 129, 0.1); color: var(--success); }
 
-        /* --- Sections --- */
-        .section {
-            background: var(--surface);
-            border-radius: 20px;
-            padding: 1.8rem;
-            box-shadow: var(--card-shadow);
-            border: 1px solid var(--border);
+        /* Tables */
+        .table-container { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
+        table { width: 100%; border-collapse: collapse; text-align: left; }
+        th { padding: 1rem; font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); border-bottom: 1px solid var(--border); }
+        td { padding: 1rem; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+        tr:last-child td { border-bottom: none; }
+        .mono { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; }
+
+        /* Status Badges */
+        .badge { padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; }
+        .badge.pending { background: #3b82f6; color: white; }
+        .badge.running { background: var(--success); color: white; box-shadow: 0 0 15px rgba(16, 185, 129, 0.3); }
+        .badge.failed { background: var(--error); color: white; }
+        .badge.done { background: #475569; color: white; }
+
+        /* Buttons */
+        .btn {
+            background: var(--surface-lighter); border: 1px solid var(--border); color: var(--text-main);
+            padding: 0.5rem 0.8rem; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.75rem;
+            display: inline-flex; align-items: center; gap: 0.4rem; transition: 0.2s;
         }
+        .btn:hover { border-color: var(--primary); background: var(--primary); }
+        .btn-danger:hover { background: var(--error); border-color: var(--error); }
 
-        .section h2 {
-            font-size: 1.4rem;
-            margin-bottom: 1.5rem;
-            font-weight: 800;
-            border-bottom: 2px solid var(--bg);
-            padding-bottom: 1rem;
-        }
+        .hidden { display: none; }
 
-        .tab-content {
-            display: none;
-            animation: fadeIn 0.4s ease;
-        }
-
-        .tab-content.active {
-            display: block;
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        /* --- Worker/Queue Cards --- */
-        .worker-card,
-        .queue-card {
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 1.2rem;
-            margin-bottom: 1rem;
-            transition: var(--transition);
-        }
-
-        .worker-card:hover {
-            border-color: var(--primary);
-        }
-
-        .worker-id,
-        .queue-name {
-            font-family: 'JetBrains Mono', monospace;
-            font-weight: 600;
-            font-size: 1.1rem;
-            color: var(--primary);
-        }
-
-        .badge {
-            padding: 0.3rem 0.8rem;
-            border-radius: 8px;
-            font-size: 0.75rem;
-            font-weight: 700;
-            text-transform: uppercase;
-        }
-
-        .badge.active {
-            background: rgba(16, 185, 129, 0.15);
-            color: var(--success);
-        }
-
-        .badge.inactive {
-            background: rgba(239, 68, 68, 0.15);
-            color: var(--error);
-        }
-
-        .detail-label {
-            font-size: 0.7rem;
-            text-transform: uppercase;
-            color: var(--text-muted);
-            font-weight: 700;
-        }
-
-        .detail-value {
-            font-weight: 600;
-            font-size: 0.95rem;
-        }
-
-        /* --- Tables --- */
-        .tasks-table {
-            width: 100%;
-            border-collapse: separate;
-            border-spacing: 0 0.5rem;
-        }
-
-        .tasks-table th {
-            padding: 1rem;
-            text-align: left;
-            font-size: 0.7rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--text-muted);
-        }
-
-        .tasks-table td {
-            padding: 1rem;
-            background: var(--bg);
-            border-top: 1px solid var(--border);
-            border-bottom: 1px solid var(--border);
-            font-size: 0.9rem;
-        }
-
-        .tasks-table td:first-child {
-            border-left: 1px solid var(--border);
-            border-radius: 10px 0 0 10px;
-        }
-
-        .tasks-table td:last-child {
-            border-right: 1px solid var(--border);
-            border-radius: 0 10px 10px 0;
-        }
-
-        .status-badge {
-            padding: 0.3rem 0.6rem;
-            border-radius: 6px;
-            font-size: 0.7rem;
-            font-weight: 800;
-            text-transform: uppercase;
-        }
-
-        .status-badge.running {
-            background: var(--success);
-            color: white;
-            box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
-        }
-
-        .status-badge.pending {
-            background: var(--info);
-            color: white;
-        }
-
-        .status-badge.failed {
-            background: var(--error);
-            color: white;
-        }
-
-        .status-badge.done {
-            background: var(--text-muted);
-            color: white;
-        }
-
-        /* --- Buttons --- */
-        .action-btn {
-            background: var(--surface);
-            border: 1px solid var(--primary);
-            color: var(--primary);
-            padding: 0.4rem 0.8rem;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 700;
-            font-size: 0.75rem;
-            transition: var(--transition);
-        }
-
-        .action-btn:hover {
-            background: var(--primary);
-            color: white;
-        }
-
-        .action-btn.danger {
-            border-color: var(--error);
-            color: var(--error);
-        }
-
-        .action-btn.danger:hover {
-            background: var(--error);
-            color: white;
-        }
-
-        .spinner {
-            border: 3px solid var(--border);
-            border-top: 3px solid var(--primary);
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            animation: spin 1s linear infinite;
-            margin: 1rem auto;
-        }
-
-        @keyframes spin {
-            100% {
-                transform: rotate(360deg);
-            }
-        }
-
-        .refresh-info {
-            text-align: center;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            margin-top: 2rem;
-        }
+        /* Spinner */
+        .loader { width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
+<body>
+    <div class="app-container">
+        <header>
+            <div class="logo"><i data-lucide="zap"></i> LITE<span>Q</span></div>
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <div id="sync-status" class="status-pill online"><div class="loader" id="main-loader" style="display:none"></div> LIVE</div>
+                <div style="font-size: 0.75rem; color: var(--text-muted)" id="last-update">Syncing...</div>
+            </div>
+        </header>
 
-<body data-theme="dark">
-    <div class="header">
-        <div class="header-content">
-            <div>
-                <h1>LiteQ Monitor</h1>
-                <p style="opacity: 0.7; font-size: 0.9rem;">Real-time Dashboard</p>
-            </div>
-            <button class="theme-toggle" onclick="toggleTheme()">DARK / LIGHT</button>
-        </div>
-    </div>
-
-    <div class="container">
-        <!-- Stats -->
-        <div class="stats-grid">
-            <div class="stat-card pending">
-                <h3>Pending</h3>
-                <div class="value" id="stat-pending">-</div>
-            </div>
-            <div class="stat-card running">
-                <h3>Running</h3>
-                <div class="value" id="stat-running">-</div>
-            </div>
-            <div class="stat-card done">
-                <h3>Completed</h3>
-                <div class="value" id="stat-done">-</div>
-            </div>
-            <div class="stat-card failed">
-                <h3>Failed</h3>
-                <div class="value" id="stat-failed">-</div>
-            </div>
-            <div class="stat-card workers">
-                <h3>Workers</h3>
-                <div class="value" id="stat-workers">-</div>
-            </div>
-            <div class="stat-card">
-                <h3>Queues</h3>
-                <div class="value" id="stat-queues">-</div>
-            </div>
-        </div>
-
-        <!-- Tabs -->
-        <div class="tabs">
-            <div class="tab active" data-tab="workers">Workers</div>
-            <div class="tab" data-tab="queues">Queues</div>
-            <div class="tab" data-tab="tasks">Tasks</div>
-            <div class="tab" data-tab="failed">Failed</div>
-        </div>
-
-        <!-- Content -->
-        <div class="tab-content active" id="tab-workers">
-            <div class="section">
-                <h2>Active Workers</h2>
-                <div id="workers-list">
-                    <div class="spinner"></div>
+        <main>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Pending</h3>
+                    <div class="value" id="stat-pending">0</div>
+                    <i data-lucide="clock" class="icon" size="64"></i>
+                </div>
+                <div class="stat-card" style="border-color: var(--success)">
+                    <h3>Running</h3>
+                    <div class="value" id="stat-running" style="color: var(--success)">0</div>
+                    <i data-lucide="play" class="icon" size="64"></i>
+                </div>
+                <div class="stat-card">
+                    <h3>Failed</h3>
+                    <div class="value" id="stat-failed" style="color: var(--error)">0</div>
+                    <i data-lucide="alert-circle" class="icon" size="64"></i>
+                </div>
+                <div class="stat-card">
+                    <h3>Active Workers</h3>
+                    <div class="value" id="stat-workers" style="color: var(--primary)">0</div>
+                    <i data-lucide="cpu" class="icon" size="64"></i>
                 </div>
             </div>
-        </div>
 
-        <div class="tab-content" id="tab-queues">
-            <div class="section">
-                <h2>Task Queues</h2>
-                <div id="queues-list">
-                    <div class="spinner"></div>
+            <div class="charts-row">
+                <div class="chart-container">
+                    <canvas id="mainChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <canvas id="queueChart"></canvas>
                 </div>
             </div>
-        </div>
 
-        <div class="tab-content" id="tab-tasks">
-            <div class="section">
-                <h2>Recent Tasks</h2>
-                <div id="tasks-list">
-                    <div class="spinner"></div>
+            <div class="nav-tabs">
+                <div class="tab active" data-tab="tasks">Tasks History</div>
+                <div class="tab" data-tab="workers">Workers Info</div>
+                <div class="tab" data-tab="queues">Queues</div>
+            </div>
+
+            <div id="content-tasks" class="tab-pane">
+                <div class="table-container">
+                    <table id="tasks-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Task Name</th>
+                                <th>Status</th>
+                                <th>Runtime info</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
                 </div>
             </div>
-        </div>
 
-        <div class="tab-content" id="tab-failed">
-            <div class="section">
-                <h2>Failed Tasks</h2>
-                <div id="failed-tasks-list">
-                    <div class="spinner"></div>
-                </div>
+            <div id="content-workers" class="tab-pane hidden">
+                <div class="grid-list" id="workers-grid"></div>
             </div>
-        </div>
 
-        <div class="refresh-info">
-            AUTO_REFRESH: 5s • LAST_SYNC: <span id="last-update">-</span>
-        </div>
+            <div id="content-queues" class="tab-pane hidden">
+                <div class="grid-list" id="queues-grid"></div>
+            </div>
+        </main>
     </div>
 
     <script>
-        // --- Theme Toggle Logic ---
-        function toggleTheme() {
-            const body = document.body;
-            const theme = body.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-            body.setAttribute('data-theme', theme);
-            localStorage.setItem('liteq-theme', theme);
-        }
-        if (localStorage.getItem('liteq-theme')) {
-            document.body.setAttribute('data-theme', localStorage.getItem('liteq-theme'));
-        }
+        lucide.createIcons();
 
-        // --- Tab Switching Logic ---
+        let mainChart, queueChart;
+        const state = { activeTab: 'tasks' };
+
+        // Tab management
         document.querySelectorAll('.tab').forEach(tab => {
             tab.addEventListener('click', () => {
-                const tabName = tab.dataset.tab;
                 document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-pane').forEach(p => p.classList.add('hidden'));
                 tab.classList.add('active');
-                document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
-                document.getElementById(`tab-${tabName}`).classList.add('active');
+                state.activeTab = tab.dataset.tab;
+                document.getElementById(`content-${state.activeTab}`).classList.remove('hidden');
             });
         });
 
-        // --- API Functions ---
-        async function fetchOverview() { const r = await fetch('/api/overview'); return await r.json(); }
-        async function fetchWorkers() { const r = await fetch('/api/workers'); return await r.json(); }
-        async function fetchQueues() { const r = await fetch('/api/queues'); return await r.json(); }
-        async function fetchTasks(limit = 50) { const r = await fetch(`/api/tasks?limit=${limit}`); return await r.json(); }
-        async function fetchFailedTasks(limit = 100) { const r = await fetch(`/api/failed-tasks?limit=${limit}`); return await r.json(); }
-        async function retryTask(id) { const r = await fetch(`/api/tasks/${id}/retry`, { method: 'POST' }); return await r.json(); }
-        async function cancelTask(id) { const r = await fetch(`/api/tasks/${id}/cancel`, { method: 'POST' }); return await r.json(); }
+        function initCharts() {
+            const ctx = document.getElementById('mainChart').getContext('2d');
+            mainChart = new Chart(ctx, {
+                type: 'line',
+                data: { labels: [], datasets: [{ label: 'Tasks Done', borderColor: '#6366f1', data: [], tension: 0.4, fill: true, backgroundColor: 'rgba(99, 102, 241, 0.1)' }] },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, grid: { color: '#222938' } }, x: { grid: { display: false } } }, plugins: { legend: { display: false } } }
+            });
 
-        // --- Update Functions ---
-        function updateOverview(data) {
-            document.getElementById('stat-pending').textContent = data.total_pending || 0;
-            document.getElementById('stat-running').textContent = data.total_running || 0;
-            document.getElementById('stat-done').textContent = data.total_done || 0;
-            document.getElementById('stat-failed').textContent = data.total_failed || 0;
-            document.getElementById('stat-workers').textContent = data.active_workers || 0;
-            document.getElementById('stat-queues').textContent = data.total_queues || 0;
+            const qCtx = document.getElementById('queueChart').getContext('2d');
+            queueChart = new Chart(qCtx, {
+                type: 'doughnut',
+                data: { labels: ['Done', 'Pending', 'Failed'], datasets: [{ data: [0, 0, 0], backgroundColor: ['#10b981', '#3b82f6', '#ef4444'], borderWidth: 0 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', boxWidth: 12 } } } }
+            });
         }
 
-        function updateWorkers(workers) {
-            const container = document.getElementById('workers-list');
-            if (workers.length === 0) {
-                container.innerHTML = '<p style="text-align: center; color: var(--text-muted);">No active workers</p>';
-                return;
+        async function api(path, method = 'GET') {
+            document.getElementById('main-loader').style.display = 'block';
+            try {
+                const r = await fetch(path, { method });
+                return await r.json();
+            } finally {
+                document.getElementById('main-loader').style.display = 'none';
             }
-            container.innerHTML = workers.map(worker => {
-                const isActive = worker.active_tasks > 0;
-                return `
-                    <div class="worker-card">
-                        <div style="display:flex; justify-content:space-between; margin-bottom:1rem;">
-                            <span class="worker-id">${worker.worker_id}</span>
-                            <span class="badge ${isActive ? 'active' : 'inactive'}">${isActive ? 'Active' : 'Idle'}</span>
+        }
+
+        async function refresh() {
+            const [overview, tasks, workers, queues] = await Promise.all([
+                api('/api/overview'),
+                api('/api/tasks'),
+                api('/api/workers'),
+                api('/api/queues')
+            ]);
+
+            // Stats
+            document.getElementById('stat-pending').textContent = overview.total_pending;
+            document.getElementById('stat-running').textContent = overview.total_running;
+            document.getElementById('stat-failed').textContent = overview.total_failed;
+            document.getElementById('stat-workers').textContent = workers.length;
+
+            // Charts
+            queueChart.data.datasets[0].data = [overview.total_done, overview.total_pending, overview.total_failed];
+            queueChart.update();
+
+            // Tables
+            if (state.activeTab === 'tasks') renderTasks(tasks);
+            if (state.activeTab === 'workers') renderWorkers(workers);
+            if (state.activeTab === 'queues') renderQueues(queues);
+
+            document.getElementById('last-update').textContent = `Last sync: ${new Date().toLocaleTimeString()}`;
+        }
+
+        function renderTasks(tasks) {
+            const tbody = document.querySelector('#tasks-table tbody');
+            tbody.innerHTML = tasks.map(t => `
+                <tr>
+                    <td class="mono">#${t.id}</td>
+                    <td style="font-weight: 600">${t.name}</td>
+                    <td><span class="badge ${t.status}">${t.status}</span></td>
+                    <td>
+                        <div style="font-size: 0.75rem; color: var(--text-muted)">
+                            Worker: ${t.worker_id || '---'}<br>
+                            Queue: ${t.queue}
                         </div>
-                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap:1rem;">
-                            <div class="detail-item">
-                                <div class="detail-label">Active Tasks</div>
-                                <div class="detail-value">${worker.active_tasks}</div>
-                            </div>
-                            <div class="detail-item">
-                                <div class="detail-label">Queues</div>
-                                <div class="detail-value">${worker.queues.join(', ') || 'default'}</div>
-                            </div>
-                            <div class="detail-item">
-                                <div class="detail-label">Heartbeat</div>
-                                <div class="detail-value">${worker.last_heartbeat ? new Date(worker.last_heartbeat).toLocaleTimeString() : '-'}</div>
-                            </div>
+                    </td>
+                    <td class="mono">${new Date(t.created_at).toLocaleTimeString()}</td>
+                    <td>
+                        <div style="display: flex; gap: 0.5rem">
+                            ${t.status === 'failed' ? `<button class="btn" onclick="retryTask(${t.id})"><i data-lucide="refresh-cw" size="14"></i></button>` : ''}
+                            ${['pending', 'running'].includes(t.status) ? `<button class="btn btn-danger" onclick="cancelTask(${t.id})"><i data-lucide="trash-2" size="14"></i></button>` : ''}
                         </div>
+                    </td>
+                </tr>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        function renderWorkers(workers) {
+            const grid = document.getElementById('workers-grid');
+            if (!workers.length) { grid.innerHTML = '<div style="color: var(--text-muted)">No workers found</div>'; return; }
+            grid.innerHTML = workers.map(w => `
+                <div class="worker-card">
+                    <div class="worker-header">
+                        <div style="font-weight: 800; font-size: 1rem">@${w.worker_id}</div>
+                        <div class="status-pill online"><div style="width: 8px; height: 8px; background: var(--success); border-radius: 50%"></div> Active</div>
                     </div>
-                `;
-            }).join('');
-        }
-
-        function updateQueues(queues) {
-            const container = document.getElementById('queues-list');
-            if (queues.length === 0) {
-                container.innerHTML = '<p>No queues</p>';
-                return;
-            }
-            container.innerHTML = queues.map(q => `
-                <div class="queue-card">
-                    <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
-                        <span class="queue-name">${q.name}</span>
-                        <span class="badge active">Total: ${q.total}</span>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.8rem">
+                        <div><span style="color: var(--text-muted)">Host:</span> ${w.hostname}</div>
+                        <div><span style="color: var(--text-muted)">Tasks:</span> ${w.active_tasks} / ${w.concurrency}</div>
+                        <div style="grid-column: span 2"><span style="color: var(--text-muted)">Queues:</span> ${w.queues.join(', ')}</div>
                     </div>
                 </div>
             `).join('');
         }
 
-        function updateTasks(tasks) {
-            const container = document.getElementById('tasks-list');
-            if (tasks.length === 0) { container.innerHTML = '<p>No tasks</p>'; return; }
-            container.innerHTML = `
-                <table class="tasks-table">
-                    <thead>
-                        <tr><th>ID</th><th>Name</th><th>Status</th><th>Created</th><th>Actions</th></tr>
-                    </thead>
-                    <tbody>
-                        ${tasks.map(t => `
-                            <tr>
-                                <td class="worker-id" style="font-size:0.8rem">${t.id}</td>
-                                <td style="font-weight:600">${t.name}</td>
-                                <td><span class="status-badge ${t.status}">${t.status}</span></td>
-                                <td style="color:var(--text-muted)">${new Date(t.created_at).toLocaleTimeString()}</td>
-                                <td>
-                                    ${t.status === 'failed' ? `<button class="action-btn" onclick="handleRetry(${t.id})">Retry</button>` : ''}
-                                    ${['running', 'pending'].includes(t.status) ? `<button class="action-btn danger" onclick="handleCancel(${t.id})">Kill</button>` : ''}
-                                </td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            `;
+        function renderQueues(queues) {
+            const grid = document.getElementById('queues-grid');
+            grid.innerHTML = queues.map(q => `
+                <div class="worker-card">
+                    <div style="font-weight: 800; font-size: 1.1rem; color: var(--primary)">${q.queue || 'default'}</div>
+                    <div style="font-size: 2rem; font-weight: 700">${q.count} <span style="font-size: 0.9rem; color: var(--text-muted)">tasks</span></div>
+                    <div class="status-pill" style="background: rgba(99, 102, 241, 0.1); color: var(--primary)">${q.status}</div>
+                </div>
+            `).join('');
         }
 
-        function updateFailedTasks(tasks) {
-            const container = document.getElementById('failed-tasks-list');
-            if (tasks.length === 0) { container.innerHTML = '<p>No errors</p>'; return; }
-            container.innerHTML = `
-                <table class="tasks-table">
-                    <thead>
-                        <tr><th>ID</th><th>Error</th><th>Attempts</th><th>Action</th></tr>
-                    </thead>
-                    <tbody>
-                        ${tasks.map(t => `
-                            <tr>
-                                <td class="worker-id">#${t.id}</td>
-                                <td style="color:var(--error); font-family:var(--mono); font-size:0.75rem;">${(t.error_message || t.last_error || 'Error').substring(0, 80)}...</td>
-                                <td>${t.attempts}/${t.max_attempts}</td>
-                                <td><button class="action-btn" onclick="handleRetry(${t.id})">Retry</button></td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            `;
-        }
+        async function retryTask(id) { await api(`/api/tasks/${id}/retry`, 'POST'); refresh(); }
+        async function cancelTask(id) { if(confirm('Cancel this task?')) { await api(`/api/tasks/${id}/cancel`, 'POST'); refresh(); } }
 
-        // --- Action Handlers ---
-        async function handleRetry(id) {
-            try { await retryTask(id); refreshData(); } catch (e) { alert('Error: ' + e.message); }
-        }
-        async function handleCancel(id) {
-            if (confirm('Kill task?')) {
-                try { await cancelTask(id); refreshData(); } catch (e) { alert('Error: ' + e.message); }
-            }
-        }
-
-        // --- Refresh Loop ---
-        async function refreshData() {
-            try {
-                const [overview, workers, queues, tasks, failedTasks] = await Promise.all([
-                    fetchOverview(), fetchWorkers(), fetchQueues(), fetchTasks(), fetchFailedTasks()
-                ]);
-                updateOverview(overview);
-                updateWorkers(workers);
-                updateQueues(queues);
-                updateTasks(tasks);
-                updateFailedTasks(failedTasks);
-                document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
-            } catch (error) {
-                console.error('Refresh error:', error);
-            }
-        }
-
-        refreshData();
-        setInterval(refreshData, 5000);
+        initCharts();
+        refresh();
+        setInterval(refresh, 3000);
     </script>
 </body>
-
 </html>
