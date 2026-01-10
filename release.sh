@@ -6,6 +6,15 @@
 
 set -e  # Exit on error
 
+# Detect platform and set Python path
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]] || command -v python.exe &> /dev/null; then
+    # Windows (Git Bash or similar)
+    PYTHON="venv/Scripts/python.exe"
+else
+    # Unix-like (Linux, macOS)
+    PYTHON="venv/bin/python"
+fi
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -38,7 +47,7 @@ fi
 
 # Run tests
 echo -e "${YELLOW}Running tests...${NC}"
-venv/bin/python -m pytest -v
+"$PYTHON" -m pytest -v
 echo -e "${GREEN}[+] Tests passed${NC}"
 
 # Clean previous builds
@@ -48,7 +57,7 @@ echo -e "${GREEN}[+] Cleaned${NC}"
 
 # Build package
 echo -e "${YELLOW}Building package...${NC}"
-venv/bin/python -m build
+"$PYTHON" -m build
 echo -e "${GREEN}[+] Package built${NC}"
 
 # Commit version change if it was updated
@@ -83,7 +92,7 @@ echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     # Upload to PyPI
     echo -e "${YELLOW}Publishing to PyPI...${NC}"
-    venv/bin/python -m twine upload dist/*
+    "$PYTHON" -m twine upload dist/*
     echo -e "${GREEN}[+] Published to PyPI${NC}"
     
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
