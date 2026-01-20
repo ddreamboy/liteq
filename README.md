@@ -73,7 +73,24 @@ print(f"Enqueued task: {task_id}")
 report_id = generate_report.delay(report_id=123)
 ```
 
-### 3. Run worker
+### 3. Check task status
+
+```python
+from liteq import get_task_status
+
+# Get task status
+status = get_task_status(task_id)
+if status:
+    print(f"Status: {status['status']}")  # pending/running/done/failed
+    print(f"Attempts: {status['attempts']}/{status['max_retries']}")
+    
+    if status['status'] == 'done':
+        print(f"Result: {status['result']}")
+    elif status['status'] == 'failed':
+        print(f"Error: {status['error']}")
+```
+
+### 4. Run worker
 
 ```bash
 # Start a worker to process tasks
@@ -88,7 +105,7 @@ That's it! Your tasks will be processed in the background.
 
 ```python
 from fastapi import FastAPI
-from liteq import task
+from liteq import task, get_task_status
 from liteq.fastapi import LiteQBackgroundTasks, enqueue_task
 
 app = FastAPI()
@@ -104,17 +121,30 @@ async def api_send_email(to: str, subject: str):
     task_id = send_email.delay(to, subject)
     return {"task_id": task_id}
 
-# Method 2: FastAPI-like BackgroundTasks
+# Method 2: FastAPI-like BackgroundTasks with status checking
 @app.post("/send-email-bg")
 async def api_send_email_bg(to: str, background: LiteQBackgroundTasks):
-    background.add_task(send_email, to, "Hello!")
-    return {"message": "queued"}
+    task_id = background.add_task(send_email, to, "Hello!")
+    return {"message": "queued", "task_id": task_id}
 
 # Method 3: Helper function
 @app.post("/send-email-helper")
 async def api_send_email_helper(to: str):
     task_id = enqueue_task(send_email, to, "Welcome")
     return {"task_id": task_id}
+
+# Check task status
+@app.get("/tasks/{task_id}")
+async def check_task_status(task_id: int):
+    status = get_task_status(task_id)
+    if not status:
+        return {"error": "Task not found"}, 404
+    return {
+        "task_id": status["id"],
+        "status": status["status"],
+        "result": status.get("result"),
+        "error": status.get("error")
+    }
 ```
 
 ### Scheduled Tasks (Cron)
@@ -332,6 +362,36 @@ python examples/basic.py
 
 ## API Reference
 
+### Core Functions
+
+#### `get_task_status(task_id: int) -> dict | None`
+
+Get task status and details by task ID.
+
+**Arguments:**
+- `task_id` (int): Task ID returned by `.delay()` or `.schedule()`
+
+**Returns:** Dictionary with task information or `None` if not found
+
+**Example:**
+```python
+from liteq import task, get_task_status
+
+@task()
+def process_data(x: int):
+    return x * 2
+
+task_id = process_data.delay(5)
+
+# Check status
+status = get_task_status(task_id)
+if status:
+    print(f"Status: {status['status']}")  # pending/running/done/failed
+    print(f"Attempts: {status['attempts']}/{status['max_retries']}")
+    if status['status'] == 'done':
+        print(f"Result: {status['result']}")
+```
+
 ### Decorators
 
 
@@ -456,17 +516,44 @@ All available in `liteq.fastapi`:
 
 FastAPI-like background tasks using LiteQ.
 
+**Methods:**
+- `add_task(func, *args, **kwargs) -> int` - Add task and return task ID
+- `get_task_status(task_id: int) -> dict | None` - Get status of specific task
+- `get_all_statuses() -> list[dict]` - Get statuses of all tasks in this background instance
+- `task_ids` (property) - List of all task IDs
+
 **Example:**
 ```python
 from fastapi import FastAPI
 from liteq.fastapi import LiteQBackgroundTasks
+from liteq import task
 
 app = FastAPI()
 
+@task()
+def send_email_task(to: str):
+    # Send email
+    return {"sent": True}
+
 @app.post("/send-email")
-async def send_email(background: LiteQBackgroundTasks):
-    background.add_task(send_email_task, "user@example.com")
-    return {"message": "queued"}
+async def send_email(to: str, background: LiteQBackgroundTasks):
+    task_id = background.add_task(send_email_task, to)
+    return {"message": "queued", "task_id": task_id}
+
+@app.post("/batch-emails")
+async def batch_emails(recipients: list[str], background: LiteQBackgroundTasks):
+    for recipient in recipients:
+        background.add_task(send_email_task, recipient)
+    
+    return {
+        "message": f"Queued {len(recipients)} emails",
+        "task_ids": background.task_ids
+    }
+
+@app.get("/batch-status")
+async def batch_status(background: LiteQBackgroundTasks):
+    statuses = background.get_all_statuses()
+    return {"tasks": statuses}
 ```
 
 #### `enqueue_task(task_func, *args, **kwargs) -> int`

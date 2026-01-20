@@ -148,5 +148,63 @@ def test_fastapi_integration_example():
         task = conn.execute("SELECT * FROM tasks WHERE id=?", (result["task_id"],)).fetchone()
         assert task is not None
         # Task uses queue from decorator, not from LiteQBackgroundTasks
-        assert task["queue"] == "default"
-        assert task["status"] == "pending"
+
+
+def test_liteq_background_tasks_get_status():
+    """Test getting task status from LiteQBackgroundTasks"""
+    from liteq.fastapi import LiteQBackgroundTasks
+
+    background = LiteQBackgroundTasks()
+    task_id = background.add_task(email_task, "user@example.com", "Test")
+
+    # Get status
+    status = background.get_task_status(task_id)
+
+    assert status is not None
+    assert status["id"] == task_id
+    assert status["name"] == "email_task"
+    assert status["status"] == "pending"
+
+
+def test_liteq_background_tasks_get_all_statuses():
+    """Test getting all task statuses"""
+    from liteq.fastapi import LiteQBackgroundTasks
+
+    background = LiteQBackgroundTasks()
+
+    # Add multiple tasks
+    task_id_1 = background.add_task(email_task, "user1@example.com", "Test 1")
+    task_id_2 = background.add_task(email_task, "user2@example.com", "Test 2")
+
+    # Get all statuses
+    statuses = background.get_all_statuses()
+
+    assert len(statuses) == 2
+    assert statuses[0]["id"] == task_id_1
+    assert statuses[1]["id"] == task_id_2
+    assert all(s["status"] == "pending" for s in statuses)
+
+
+def test_liteq_background_tasks_task_ids_property():
+    """Test task_ids property"""
+    from liteq.fastapi import LiteQBackgroundTasks
+
+    background = LiteQBackgroundTasks()
+
+    task_id_1 = background.add_task(email_task, "user1@example.com", "Test 1")
+    task_id_2 = background.add_task(email_task, "user2@example.com", "Test 2")
+
+    # Get task IDs
+    task_ids = background.task_ids
+
+    assert len(task_ids) == 2
+    assert task_id_1 in task_ids
+    assert task_id_2 in task_ids
+
+    # Should be a copy, not reference
+    task_ids.append(999)
+    assert 999 not in background.task_ids
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

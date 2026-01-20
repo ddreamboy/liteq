@@ -55,6 +55,16 @@ async def tasks(limit: int = 50):
     return get_recent_tasks(limit)
 
 
+@app.get("/api/tasks/{task_id}")
+async def get_task(task_id: int):
+    """Get task status and details by ID"""
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
+        if row:
+            return dict(row)
+        return {"error": "Task not found"}, 404
+
+
 @app.get("/api/failed-tasks")
 async def failed():
     return get_failed_tasks()

@@ -101,3 +101,35 @@ def task(queue="default", max_retries=3, name=None, timeout=None):
         return wrapper
 
     return decorator
+
+
+def get_task_status(task_id: int) -> dict:
+    """
+    Get task status and details by task ID.
+
+    Args:
+        task_id: Task ID returned by .delay() or .schedule()
+
+    Returns:
+        dict: Task information including status, attempts, result, error, etc.
+        None: If task not found
+
+    Example:
+        task_id = my_task.delay(arg1, arg2)
+
+        # Check status
+        info = get_task_status(task_id)
+        if info:
+            print(f"Status: {info['status']}")
+            print(f"Attempts: {info['attempts']}/{info['max_retries']}")
+            if info['status'] == 'done':
+                print(f"Result: {info['result']}")
+            elif info['status'] == 'failed':
+                print(f"Error: {info['error']}")
+    """
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
+
+        if row:
+            return dict(row)
+        return None

@@ -73,7 +73,24 @@ print(f"Добавлена задача: {task_id}")
 report_id = generate_report.delay(report_id=123)
 ```
 
-### 3. Запустите воркер
+### 3. Проверьте статус задачи
+
+```python
+from liteq import get_task_status
+
+# Получаем статус задачи
+status = get_task_status(task_id)
+if status:
+    print(f"Статус: {status['status']}")  # pending/running/done/failed
+    print(f"Попытки: {status['attempts']}/{status['max_retries']}")
+    
+    if status['status'] == 'done':
+        print(f"Результат: {status['result']}")
+    elif status['status'] == 'failed':
+        print(f"Ошибка: {status['error']}")
+```
+
+### 4. Запустите воркер
 
 ```bash
 # Запускаем воркер для обработки задач
@@ -88,7 +105,7 @@ liteq worker --app tasks.py --queues default,reports --concurrency 4
 
 ```python
 from fastapi import FastAPI
-from liteq import task
+from liteq import task, get_task_status
 from liteq.fastapi import LiteQBackgroundTasks, enqueue_task
 
 app = FastAPI()
@@ -104,17 +121,30 @@ async def api_send_email(to: str, subject: str):
     task_id = send_email.delay(to, subject)
     return {"task_id": task_id}
 
-# Способ 2: FastAPI-подобный BackgroundTasks
+# Способ 2: FastAPI-подобный BackgroundTasks с проверкой статуса
 @app.post("/send-email-bg")
 async def api_send_email_bg(to: str, background: LiteQBackgroundTasks):
-    background.add_task(send_email, to, "Привет!")
-    return {"message": "queued"}
+    task_id = background.add_task(send_email, to, "Привет!")
+    return {"message": "queued", "task_id": task_id}
 
 # Способ 3: Helper-функция
 @app.post("/send-email-helper")
 async def api_send_email_helper(to: str):
     task_id = enqueue_task(send_email, to, "Добро пожаловать")
     return {"task_id": task_id}
+
+# Проверка статуса задачи
+@app.get("/tasks/{task_id}")
+async def check_task_status(task_id: int):
+    status = get_task_status(task_id)
+    if not status:
+        return {"error": "Задача не найдена"}, 404
+    return {
+        "task_id": status["id"],
+        "status": status["status"],
+        "result": status.get("result"),
+        "error": status.get("error")
+    }
 ```
 
 ### Запланированные задачи (Cron)
@@ -310,6 +340,36 @@ python examples/basic.py
 ```
 
 ## Справочник API
+
+### Основные функции
+
+#### `get_task_status(task_id: int) -> dict | None`
+
+Получить статус и детали задачи по ID.
+
+**Аргументы:**
+- `task_id` (int): ID задачи, возвращённый `.delay()` или `.schedule()`
+
+**Возвращает:** Словарь с информацией о задаче или `None`, если не найдена
+
+**Пример:**
+```python
+from liteq import task, get_task_status
+
+@task()
+def process_data(x: int):
+    return x * 2
+
+task_id = process_data.delay(5)
+
+# Проверка статуса
+status = get_task_status(task_id)
+if status:
+    print(f"Статус: {status['status']}")  # pending/running/done/failed
+    print(f"Попытки: {status['attempts']}/{status['max_retries']}")
+    if status['status'] == 'done':
+        print(f"Результат: {status['result']}")
+```
 
 ### Декоратор
 

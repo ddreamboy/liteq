@@ -234,5 +234,36 @@ def test_sync_task_registration():
     assert callable(TASK_REGISTRY["sync_task"])
 
 
+def test_get_task_status():
+    """Test getting task status by ID"""
+    from liteq import get_task_status
+
+    @task()
+    def status_test_task(x: int):
+        return x * 2
+
+    # Enqueue task
+    task_id = status_test_task.delay(5)
+
+    # Get status
+    status = get_task_status(task_id)
+
+    assert status is not None
+    assert status["id"] == task_id
+    assert status["name"] == "status_test_task"
+    assert status["status"] == "pending"
+    assert status["queue"] == "default"
+    assert status["attempts"] == 0
+    assert status["max_retries"] == 3
+
+
+def test_get_task_status_not_found():
+    """Test getting status of non-existent task"""
+    from liteq import get_task_status
+
+    status = get_task_status(99999)
+    assert status is None
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
