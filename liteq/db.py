@@ -56,7 +56,11 @@ def init_db():
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )""")
 
+        # Indexes for performance
         conn.execute("CREATE INDEX IF NOT EXISTS idx_fetch ON tasks(status, queue, priority DESC, run_at)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_worker_status ON tasks(worker_id, status)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_status_finished ON tasks(status, finished_at)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_schedules_next_run ON schedules(enabled, next_run)")
 
         # Add columns if they don't exist (migration)
         try:

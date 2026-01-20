@@ -1,13 +1,17 @@
 import asyncio
 import inspect
 import json
+import logging
 import os
 import socket
 import time
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta
 
 from .core import TASK_REGISTRY
 from .db import get_conn
+
+logger = logging.getLogger(__name__)
 
 
 def _run_task_in_thread(t_id, t_name, t_payload, worker_id, timeout=None):
@@ -46,11 +50,32 @@ def _run_task_in_thread(t_id, t_name, t_payload, worker_id, timeout=None):
         import traceback
 
         error_msg = f"{str(e)}\n{traceback.format_exc()}"
+
+        # Retry logic with exponential backoff
         with get_conn() as conn:
-            conn.execute(
-                "UPDATE tasks SET status='failed', error=?, finished_at=CURRENT_TIMESTAMP, worker_id=? WHERE id=?",
-                (error_msg, worker_id, t_id),
-            )
+            task_info = conn.execute("SELECT attempts, max_retries FROM tasks WHERE id=?", (t_id,)).fetchone()
+
+            new_attempts = task_info["attempts"] + 1
+
+            if new_attempts < task_info["max_retries"]:
+                # Retry: return to pending with exponential backoff
+                retry_delay_seconds = min(300, (2**new_attempts) * 10)  # max 5 min
+                run_at = (datetime.now() + timedelta(seconds=retry_delay_seconds)).isoformat()
+
+                conn.execute(
+                    "UPDATE tasks SET status='pending', attempts=?, error=?, worker_id=NULL, run_at=? WHERE id=?",
+                    (new_attempts, error_msg, run_at, t_id),
+                )
+                logger.info(
+                    f"Task {t_id} failed (attempt {new_attempts}/{task_info['max_retries']}), retrying in {retry_delay_seconds}s"
+                )
+            else:
+                # Final failure
+                conn.execute(
+                    "UPDATE tasks SET status='failed', attempts=?, error=?, finished_at=CURRENT_TIMESTAMP, worker_id=? WHERE id=?",
+                    (new_attempts, error_msg, worker_id, t_id),
+                )
+                logger.error(f"Task {t_id} failed permanently after {new_attempts} attempts")
 
 
 class Worker:
@@ -80,11 +105,11 @@ class Worker:
             )
 
     def run(self):
-        print(f"[*] LiteQ Worker {self.worker_id} started.")
-        print(f"[*] Queues: {', '.join(self.queues)}")
-        print(f"[*] Concurrency: {self.concurrency}")
+        logger.info(f"LiteQ Worker {self.worker_id} started")
+        logger.info(f"Queues: {', '.join(self.queues)}")
+        logger.info(f"Concurrency: {self.concurrency}")
         if self.task_timeout:
-            print(f"[*] Task timeout: {self.task_timeout}s")
+            logger.info(f"Task timeout: {self.task_timeout}s")
 
         try:
             while not self.shutdown:
@@ -93,16 +118,23 @@ class Worker:
                 self._fetch_and_run()
                 time.sleep(0.5)
         except KeyboardInterrupt:
-            print("\n[*] Shutting down gracefully...")
+            logger.info("Shutting down gracefully...")
             self.shutdown = True
         finally:
             self.pool.shutdown(wait=True)
             with get_conn() as conn:
                 conn.execute("DELETE FROM workers WHERE worker_id=?", (self.worker_id,))
-            print("[*] Worker stopped.")
+            logger.info("Worker stopped")
 
     def _check_stuck_tasks(self):
-        """Check for stuck tasks and kill them if timeout exceeded"""
+        """
+        Check for stuck tasks and mark them as failed if timeout exceeded.
+
+        Note: future.cancel() does NOT interrupt already running threads.
+        This method only marks tasks as failed in the database if they exceed
+        the timeout threshold. The actual thread will continue running until
+        completion. For true task interruption, use ProcessPoolExecutor instead.
+        """
         if not self.task_timeout:
             return
 
@@ -113,7 +145,9 @@ class Worker:
             elapsed = now - start_time
             if elapsed > self.task_timeout:
                 stuck_tasks.append(task_id)
-                print(f"[!] Task {task_id} exceeded timeout ({elapsed:.1f}s > {self.task_timeout}s), cancelling...")
+                logger.warning(f"Task {task_id} exceeded timeout ({elapsed:.1f}s > {self.task_timeout}s)")
+
+                # Note: cancel() won't stop already running thread, only prevents it from starting
                 future.cancel()
 
                 # Mark as failed in DB
@@ -138,24 +172,32 @@ class Worker:
             return
 
         with get_conn() as conn:
-            q_marks = ",".join(["?"] * len(self.queues))
-            row = conn.execute(
-                f"""
-                UPDATE tasks SET status='running', worker_id=?
-                WHERE id = (
-                    SELECT id FROM tasks 
-                    WHERE status='pending' AND queue IN ({q_marks})
-                    AND run_at <= CURRENT_TIMESTAMP
-                    ORDER BY priority DESC, id ASC LIMIT 1
-                ) RETURNING id, name, payload
-            """,
-                (self.worker_id, *self.queues),
-            ).fetchone()
+            # Use BEGIN IMMEDIATE to prevent race conditions between multiple workers
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                q_marks = ",".join(["?"] * len(self.queues))
+                row = conn.execute(
+                    f"""
+                    UPDATE tasks SET status='running', worker_id=?
+                    WHERE id = (
+                        SELECT id FROM tasks 
+                        WHERE status='pending' AND queue IN ({q_marks})
+                        AND run_at <= CURRENT_TIMESTAMP
+                        ORDER BY priority DESC, id ASC LIMIT 1
+                    ) RETURNING id, name, payload
+                """,
+                    (self.worker_id, *self.queues),
+                ).fetchone()
 
-            if row:
-                task_id = row["id"]
-                future = self.pool.submit(
-                    _run_task_in_thread, task_id, row["name"], row["payload"], self.worker_id, self.task_timeout
-                )
-                self.running_tasks[task_id] = (future, time.time())
-                print(f"[+] Started task {task_id}: {row['name']}")
+                if row:
+                    task_id = row["id"]
+                    future = self.pool.submit(
+                        _run_task_in_thread, task_id, row["name"], row["payload"], self.worker_id, self.task_timeout
+                    )
+                    self.running_tasks[task_id] = (future, time.time())
+                    logger.info(f"Started task {task_id}: {row['name']}")
+
+                conn.commit()
+            except Exception as e:
+                conn.rollback()
+                logger.error(f"Error fetching task: {e}")

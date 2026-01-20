@@ -1,11 +1,14 @@
 """Cron-like scheduling for LiteQ tasks"""
 
 import json
+import logging
 import time
 from datetime import datetime, timedelta
 from typing import Callable, Optional
 
 from .db import get_conn, init_db
+
+logger = logging.getLogger(__name__)
 
 
 def parse_cron(cron_expr: str) -> dict:
@@ -132,7 +135,7 @@ class Scheduler:
     def run(self):
         """Run scheduler loop"""
         init_db()
-        print(f"[*] LiteQ Scheduler started (checking every {self.check_interval}s)")
+        logger.info(f"LiteQ Scheduler started (checking every {self.check_interval}s)")
         self.running = True
 
         try:
@@ -140,7 +143,7 @@ class Scheduler:
                 self._process_schedules()
                 time.sleep(self.check_interval)
         except KeyboardInterrupt:
-            print("\n[*] Scheduler stopped")
+            logger.info("Scheduler stopped")
             self.running = False
 
     def _process_schedules(self):
@@ -185,10 +188,10 @@ class Scheduler:
                         (now.isoformat(), next_run.isoformat(), schedule_id),
                     )
 
-                    print(f"[+] Scheduled task '{task_name}' (next run: {next_run})")
+                    logger.info(f"Scheduled task '{task_name}' (next run: {next_run})")
 
                 except Exception as e:
-                    print(f"[!] Error scheduling task '{task_name}': {e}")
+                    logger.error(f"Error scheduling task '{task_name}': {e}")
 
 
 def list_schedules():

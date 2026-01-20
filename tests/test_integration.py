@@ -90,22 +90,34 @@ def test_async_task_execution():
 
 
 def test_failing_task_execution():
-    """Test that failing tasks are marked as failed"""
+    """Test that failing tasks are retried and eventually marked as failed"""
     task_id = failing_task.delay()
 
-    with get_conn() as conn:
-        task_row = conn.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
-
+    # Task has max_retries=3 by default, so it will retry 3 times (attempts 0, 1, 2)
     worker_id = "test-worker"
-    _run_task_in_thread(task_row["id"], task_row["name"], task_row["payload"], worker_id)
 
-    time.sleep(0.5)
+    # Run 3 times - after this, attempts will be 3, which equals max_retries
+    for attempt in range(3):
+        with get_conn() as conn:
+            task_row = conn.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
+            assert task_row is not None
 
-    with get_conn() as conn:
-        result = conn.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
-        assert result["status"] == "failed"
-        assert "ValueError" in result["error"]
+        _run_task_in_thread(task_row["id"], task_row["name"], task_row["payload"], worker_id)
+        time.sleep(0.1)
 
+        with get_conn() as conn:
+            result = conn.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
+            # First 2 attempts should go back to pending
+            if attempt < 2:
+                assert result["status"] == "pending"
+                assert result["attempts"] == attempt + 1
+            else:
+                # Last attempt should fail
+                assert result["status"] == "failed"
+                assert result["attempts"] == 3
+                assert "This task always fails" in result["error"]
+
+    # Verify final state
     with get_conn() as conn:
         task_row = conn.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
 

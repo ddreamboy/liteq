@@ -1,3 +1,4 @@
+import logging
 import os
 
 import uvicorn
@@ -13,6 +14,8 @@ from .monitoring import (
     get_recent_tasks,
     list_queues,
 )
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="LiteQ Monitor")
 
@@ -92,5 +95,5 @@ async def workers():
 
 def run_monitor(host="127.0.0.1", port=5151):
     init_db()
-    print(f"[*] LiteQ Monitor UI: http://{host}:{port}")
+    logger.info(f"LiteQ Monitor UI: http://{host}:{port}")
     uvicorn.run(app, host=host, port=port, log_level="error")
