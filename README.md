@@ -29,7 +29,7 @@ LiteQ is a pure Python task queue built on SQLite, perfect for background job pr
 🚀 **FastAPI Integration** - Built-in FastAPI support  
 📊 **Monitoring** - Track stats, workers, and task status  
 💾 **Persistent** - SQLite-backed for reliability  
-🧪 **Production Ready**
+🧪 **Production Ready** - test coverage >80%
 
 ## Installation
 
@@ -491,7 +491,7 @@ init_db()
 │   ├── monitoring.py     # Stats and monitoring
 │   └── web.py            # Web dashboard (optional)
 ├── examples/             # Complete examples
-├── tests/                # 92% coverage
+├── tests/                # >80% coverage
 ├── README.md
 ## Project Structure
 
