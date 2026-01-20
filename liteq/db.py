@@ -27,9 +27,11 @@ def init_db():
             worker_id TEXT,
             run_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            started_at DATETIME,
             finished_at DATETIME,
             result TEXT,
-            error TEXT
+            error TEXT,
+            timeout INTEGER
         )""")
 
         conn.execute("""
@@ -41,6 +43,27 @@ def init_db():
             last_heartbeat DATETIME DEFAULT CURRENT_TIMESTAMP
         )""")
 
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_fetch ON tasks(status, queue, priority DESC, run_at)"
-        )
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS schedules (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_name TEXT NOT NULL,
+            cron_expr TEXT NOT NULL,
+            payload TEXT NOT NULL,
+            queue TEXT NOT NULL,
+            enabled INTEGER DEFAULT 1,
+            last_run DATETIME,
+            next_run DATETIME,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )""")
+
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_fetch ON tasks(status, queue, priority DESC, run_at)")
+
+        # Add columns if they don't exist (migration)
+        try:
+            conn.execute("ALTER TABLE tasks ADD COLUMN started_at DATETIME")
+        except:
+            pass
+        try:
+            conn.execute("ALTER TABLE tasks ADD COLUMN timeout INTEGER")
+        except:
+            pass

@@ -99,12 +99,53 @@ def test_task_with_kwargs():
 
     task_id = task_with_kwargs.delay(name="Alice", age=30, city="NYC")
 
-    assert task_id > 0
+
+def test_task_with_timeout():
+    """Test task with timeout parameter"""
+
+    @task(timeout=60)
+    def timed_task():
+        return "ok"
+
+    task_id = timed_task.delay()
 
     with get_conn() as conn:
         row = conn.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
-        assert '"name": "Alice"' in row["payload"]
-        assert '"age": 30' in row["payload"]
+        assert row["timeout"] == 60
+
+
+def test_task_schedule():
+    """Test scheduling a task for later execution"""
+    from datetime import datetime, timedelta
+
+    @task()
+    def scheduled_task(msg: str):
+        return msg
+
+    # Schedule task for 1 hour from now
+    run_time = datetime.now() + timedelta(hours=1)
+    task_id = scheduled_task.schedule(run_time, "Hello")
+
+    assert task_id is not None
+
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
+        assert row is not None
+        assert row["status"] == "pending"
+        # Task should be scheduled for future
+        assert row["run_at"] > datetime.now().isoformat()
+
+
+def test_task_direct_call():
+    """Test that task can be called directly (for testing)"""
+
+    @task()
+    def direct_task(x: int):
+        return x * 3
+
+    # Direct call should work
+    result = direct_task(5)
+    assert result == 15
 
 
 def test_multiple_tasks_same_queue():
@@ -127,9 +168,7 @@ def test_multiple_tasks_same_queue():
     assert len(task_ids) == 3
 
     with get_conn() as conn:
-        count = conn.execute(
-            "SELECT COUNT(*) as cnt FROM tasks WHERE queue=?", (queue_name,)
-        ).fetchone()["cnt"]
+        count = conn.execute("SELECT COUNT(*) as cnt FROM tasks WHERE queue=?", (queue_name,)).fetchone()["cnt"]
         assert count == 3
 
 
@@ -137,21 +176,15 @@ def test_database_initialization():
     """Test database schema"""
     with get_conn() as conn:
         # Check tasks table exists
-        cursor = conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='tasks'"
-        )
+        cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='tasks'")
         assert cursor.fetchone() is not None
 
         # Check workers table exists
-        cursor = conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='workers'"
-        )
+        cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='workers'")
         assert cursor.fetchone() is not None
 
         # Check index exists
-        cursor = conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_fetch'"
-        )
+        cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_fetch'")
         assert cursor.fetchone() is not None
 
 

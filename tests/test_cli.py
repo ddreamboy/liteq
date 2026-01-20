@@ -64,9 +64,7 @@ def sample_task():
                 main()
 
                 # Verify Worker was initialized with default params
-                MockWorker.assert_called_once_with(
-                    queues=["default"], concurrency=4
-                )
+                MockWorker.assert_called_once_with(queues=["default"], concurrency=4, task_timeout=None)
                 mock_instance.run.assert_called_once()
     finally:
         os.chdir(original_cwd)
@@ -98,6 +96,8 @@ def my_task():
                 "emails,reports",
                 "--concurrency",
                 "8",
+                "--timeout",
+                "60",
             ],
         ):
             with patch("liteq.cli.Worker") as MockWorker:
@@ -107,9 +107,7 @@ def my_task():
                 main()
 
                 # Verify Worker was initialized with correct params
-                MockWorker.assert_called_once_with(
-                    queues=["emails", "reports"], concurrency=8
-                )
+                MockWorker.assert_called_once_with(queues=["emails", "reports"], concurrency=8, task_timeout=60)
                 mock_instance.run.assert_called_once()
     finally:
         os.chdir(original_cwd)

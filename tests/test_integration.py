@@ -8,7 +8,7 @@ import pytest
 
 from liteq import task
 from liteq.db import get_conn, init_db
-from liteq.worker import _run_in_subprocess
+from liteq.worker import _run_task_in_thread
 
 TEST_DB = "test_integration.db"
 
@@ -54,22 +54,19 @@ def test_sync_task_execution():
 
     # Get task details
     with get_conn() as conn:
-        task_row = conn.execute(
-            "SELECT * FROM tasks WHERE id=?", (task_id,)
-        ).fetchone()
+        task_row = conn.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
         assert task_row is not None
 
     # Execute task
-    _run_in_subprocess(task_row["id"], task_row["name"], task_row["payload"])
+    worker_id = "test-worker"
+    _run_task_in_thread(task_row["id"], task_row["name"], task_row["payload"], worker_id)
 
     # Give it a moment to complete
     time.sleep(0.5)
 
     # Check result
     with get_conn() as conn:
-        result = conn.execute(
-            "SELECT * FROM tasks WHERE id=?", (task_id,)
-        ).fetchone()
+        result = conn.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
         assert result["status"] == "done"
         assert "21" in result["result"]
 
@@ -79,18 +76,15 @@ def test_async_task_execution():
     task_id = async_add.delay(10, 20)
 
     with get_conn() as conn:
-        task_row = conn.execute(
-            "SELECT * FROM tasks WHERE id=?", (task_id,)
-        ).fetchone()
+        task_row = conn.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
 
-    _run_in_subprocess(task_row["id"], task_row["name"], task_row["payload"])
+    worker_id = "test-worker"
+    _run_task_in_thread(task_row["id"], task_row["name"], task_row["payload"], worker_id)
 
     time.sleep(0.5)
 
     with get_conn() as conn:
-        result = conn.execute(
-            "SELECT * FROM tasks WHERE id=?", (task_id,)
-        ).fetchone()
+        result = conn.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
         assert result["status"] == "done"
         assert "30" in result["result"]
 
@@ -100,18 +94,28 @@ def test_failing_task_execution():
     task_id = failing_task.delay()
 
     with get_conn() as conn:
-        task_row = conn.execute(
-            "SELECT * FROM tasks WHERE id=?", (task_id,)
-        ).fetchone()
+        task_row = conn.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
 
-    _run_in_subprocess(task_row["id"], task_row["name"], task_row["payload"])
+    worker_id = "test-worker"
+    _run_task_in_thread(task_row["id"], task_row["name"], task_row["payload"], worker_id)
 
     time.sleep(0.5)
 
     with get_conn() as conn:
-        result = conn.execute(
-            "SELECT * FROM tasks WHERE id=?", (task_id,)
-        ).fetchone()
+        result = conn.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
+        assert result["status"] == "failed"
+        assert "ValueError" in result["error"]
+
+    with get_conn() as conn:
+        task_row = conn.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
+
+    worker_id = "test-worker"
+    _run_task_in_thread(task_row["id"], task_row["name"], task_row["payload"], worker_id)
+
+    time.sleep(0.5)
+
+    with get_conn() as conn:
+        result = conn.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
         assert result["status"] == "failed"
         assert "This task always fails" in result["error"]
 
@@ -126,18 +130,15 @@ def test_task_with_no_args():
     task_id = no_args_task.delay()
 
     with get_conn() as conn:
-        task_row = conn.execute(
-            "SELECT * FROM tasks WHERE id=?", (task_id,)
-        ).fetchone()
+        task_row = conn.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
 
-    _run_in_subprocess(task_row["id"], task_row["name"], task_row["payload"])
+    worker_id = "test-worker"
+    _run_task_in_thread(task_row["id"], task_row["name"], task_row["payload"], worker_id)
 
     time.sleep(0.5)
 
     with get_conn() as conn:
-        result = conn.execute(
-            "SELECT * FROM tasks WHERE id=?", (task_id,)
-        ).fetchone()
+        result = conn.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
         assert result["status"] == "done"
 
 

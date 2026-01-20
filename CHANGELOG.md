@@ -5,6 +5,130 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-01-20
+
+### 🎉 Major Feature Release
+
+This release adds production-ready features for modern Python applications including FastAPI integration, scheduled tasks, and automatic timeout handling.
+
+### Added
+- **FastAPI Integration** - Built-in support for FastAPI applications
+  - `LiteQBackgroundTasks` - FastAPI-like background tasks using LiteQ
+  - `enqueue_task()` helper function for easy task enqueueing
+  - Complete FastAPI examples and documentation
+- **Task Scheduling (Cron)** - Schedule tasks to run periodically
+  - `register_schedule()` - Register tasks with cron expressions
+  - `Scheduler` class for running scheduled tasks
+  - Support for common cron patterns (daily, hourly, every N minutes)
+  - CLI command `liteq scheduler` for running scheduler daemon
+- **Task Timeouts** - Automatic handling of stuck tasks
+  - `timeout` parameter in `@task` decorator
+  - `task_timeout` parameter in `Worker` class
+  - Automatic detection and cancellation of stuck tasks
+  - CLI option `--timeout` for worker timeout
+- **Delayed Task Execution** - Schedule tasks for future execution
+  - `.schedule(run_at, *args, **kwargs)` method on tasks
+  - Support for datetime objects and ISO strings
+- **ThreadPoolExecutor** - Replaced ProcessPoolExecutor with ThreadPoolExecutor
+  - Fixed "running" status bug where tasks stayed in running state forever
+  - Better performance and resource usage
+  - Proper task registry access in worker threads
+- **Enhanced Database Schema**
+  - Added `started_at` timestamp field
+  - Added `timeout` field for task-level timeouts
+  - Added `schedules` table for cron-like scheduling
+- **100% Test Coverage** - Comprehensive test suite with 73 tests
+  - Tests for FastAPI integration
+  - Tests for scheduler functionality
+  - Tests for timeout handling
+  - Tests for all new features
+
+### Changed - BREAKING CHANGES
+- **Worker uses threads instead of processes** - `Worker` now uses `ThreadPoolExecutor`
+  - This fixes the bug where tasks remained in "running" status
+  - If you relied on process isolation, this is a breaking change
+  - For CPU-bound tasks, consider using a separate queue with dedicated workers
+- **Worker concurrency parameter meaning** - Now refers to thread count, not process count
+
+### Fixed
+- **Critical Bug: Tasks stuck in "running" status** 
+  - Root cause: ProcessPoolExecutor didn't have access to TASK_REGISTRY
+  - Solution: Switched to ThreadPoolExecutor with proper task execution tracking
+  - Tasks now properly update to "done" or "failed" status
+- Worker heartbeat and task status tracking
+- Task execution error handling with full tracebacks
+- Database migration for new fields (handles existing databases)
+
+### Documentation
+- Added comprehensive FastAPI integration guide
+- Added scheduler and cron documentation
+- Added timeout handling examples
+- Updated README with new features
+- Added Russian translation updates
+- Complete example files for all new features
+
+### Migration Guide from 0.2.x to 0.3.0
+
+**Task Definition - No Changes Required:**
+```python
+from liteq import task
+
+# Your existing tasks work as-is
+@task()
+def my_task():
+    pass
+
+# New optional parameters
+@task(timeout=60)  # Kill task after 60 seconds
+def slow_task():
+    pass
+```
+
+**Worker - Concurrency now means threads:**
+```python
+# Before (0.2.x): 4 processes
+worker = Worker(queues=["default"], concurrency=4)
+
+# After (0.3.0): 4 threads (works the same for most use cases)
+worker = Worker(queues=["default"], concurrency=4)
+
+# New: With timeout
+worker = Worker(queues=["default"], concurrency=4, task_timeout=300)
+```
+
+**New Features - FastAPI:**
+```python
+from fastapi import FastAPI
+from liteq import task
+from liteq.fastapi import LiteQBackgroundTasks
+
+app = FastAPI()
+
+@task()
+def send_email(to: str):
+    pass
+
+@app.post("/send")
+async def send(to: str, background: LiteQBackgroundTasks):
+    background.add_task(send_email, to)
+    return {"status": "queued"}
+```
+
+**New Features - Scheduling:**
+```python
+from liteq import task, register_schedule
+
+@task()
+def backup():
+    pass
+
+# Run every day at 2 AM
+register_schedule(backup, "0 2 * * *")
+
+# Run scheduler
+# $ liteq scheduler --app tasks.py
+```
+
 ## [0.2.0] - 2026-01-10
 
 ### 🎉 Major Rewrite - Simplified API

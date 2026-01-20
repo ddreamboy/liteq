@@ -24,9 +24,12 @@ LiteQ is a pure Python task queue built on SQLite, perfect for background job pr
 🎯 **Task Priorities** - Control execution order  
 🔁 **Auto Retry** - Configurable retry logic  
 👷 **Multiple Workers** - Process tasks in parallel  
+⏰ **Task Scheduling** - Cron-like scheduled tasks  
+⏱️ **Task Timeouts** - Automatic timeout and stuck task handling  
+🚀 **FastAPI Integration** - Built-in FastAPI support  
 📊 **Monitoring** - Track stats, workers, and task status  
 💾 **Persistent** - SQLite-backed for reliability  
-🚀 **Production Ready** - 92% test coverage  
+🧪 **Production Ready**
 
 ## Installation
 
@@ -80,6 +83,98 @@ liteq worker --app tasks.py --queues default,reports --concurrency 4
 That's it! Your tasks will be processed in the background.
 
 ## Examples
+
+### FastAPI Integration
+
+```python
+from fastapi import FastAPI
+from liteq import task
+from liteq.fastapi import LiteQBackgroundTasks, enqueue_task
+
+app = FastAPI()
+
+@task(queue="emails", timeout=60)
+async def send_email(to: str, subject: str):
+    # Send email logic
+    return {"sent": True}
+
+# Method 1: Simple .delay()
+@app.post("/send-email")
+async def api_send_email(to: str, subject: str):
+    task_id = send_email.delay(to, subject)
+    return {"task_id": task_id}
+
+# Method 2: FastAPI-like BackgroundTasks
+@app.post("/send-email-bg")
+async def api_send_email_bg(to: str, background: LiteQBackgroundTasks):
+    background.add_task(send_email, to, "Hello!")
+    return {"message": "queued"}
+
+# Method 3: Helper function
+@app.post("/send-email-helper")
+async def api_send_email_helper(to: str):
+    task_id = enqueue_task(send_email, to, "Welcome")
+    return {"task_id": task_id}
+```
+
+### Scheduled Tasks (Cron)
+
+```python
+from liteq import task, register_schedule
+from liteq.scheduler import Scheduler
+
+@task()
+def daily_backup():
+    print("Running backup...")
+    return {"status": "success"}
+
+@task()
+def cleanup():
+    print("Cleaning up...")
+
+# Register schedules
+register_schedule(daily_backup, "0 2 * * *")  # Every day at 2 AM
+register_schedule(cleanup, "*/5 * * * *")  # Every 5 minutes
+
+# Run scheduler
+scheduler = Scheduler(check_interval=60)
+scheduler.run()
+```
+
+```bash
+# Or via CLI
+liteq scheduler --app tasks.py --interval 60
+```
+
+### Task Timeouts
+
+```python
+from liteq import task
+
+# Timeout on task level
+@task(timeout=30)  # 30 seconds
+def slow_task():
+    import time
+    time.sleep(100)  # Will be killed after 30s
+
+# Timeout on worker level
+# liteq worker --app tasks.py --timeout 60
+```
+
+### Delayed Execution
+
+```python
+from liteq import task
+from datetime import datetime, timedelta
+
+@task()
+def reminder(message: str):
+    print(f"Reminder: {message}")
+
+# Schedule for later
+run_time = datetime.now() + timedelta(hours=1)
+task_id = reminder.schedule(run_time, "Meeting in 1 hour")
+```
 
 ### Async Tasks
 
@@ -162,7 +257,13 @@ liteq worker --app tasks.py --queues emails,reports,notifications
 # Custom concurrency
 liteq worker --app tasks.py --concurrency 8
 
-# Monitor dashboard (requires liteq[web])
+# With timeout (kills stuck tasks)
+liteq worker --app tasks.py --timeout 300
+
+# Run scheduler
+liteq scheduler --app tasks.py --interval 60
+
+# Monitor dashboard
 liteq monitor --port 5151
 ```
 
@@ -234,7 +335,7 @@ python examples/basic.py
 ### Decorators
 
 
-#### `@task(queue='default', max_retries=3, name=None)`
+#### `@task(queue='default', max_retries=3, name=None, timeout=None)`
 
 Decorate a function to make it a task.
 
@@ -242,28 +343,35 @@ Decorate a function to make it a task.
 - `queue` (str): Queue name (default: "default")
 - `max_retries` (int): Maximum retry attempts (default: 3)
 - `name` (str, optional): Custom task name (defaults to function name)
+- `timeout` (int, optional): Task timeout in seconds (default: None)
 
-**Returns:** A callable with a `.delay(*args, **kwargs)` method
+**Returns:** A callable with `.delay(*args, **kwargs)` and `.schedule(run_at, *args, **kwargs)` methods
 
 **Example:**
 ```python
-@task(queue="emails", max_retries=5)
+@task(queue="emails", max_retries=5, timeout=60)
 def send_email(to: str):
     ...
 
 # Enqueue task
 task_id = send_email.delay(to="user@example.com")
+
+# Schedule for later
+from datetime import datetime, timedelta
+run_time = datetime.now() + timedelta(hours=1)
+task_id = send_email.schedule(run_time, to="user@example.com")
 ```
 
 ### Worker
 
-#### `Worker(queues, concurrency)`
+#### `Worker(queues, concurrency, task_timeout=None)`
 
 Create a worker to process tasks.
 
 **Arguments:**
 - `queues` (list[str]): List of queue names to process
-- `concurrency` (int): Number of concurrent processes
+- `concurrency` (int): Number of concurrent threads
+- `task_timeout` (int, optional): Timeout in seconds for stuck tasks (default: None)
 
 **Methods:**
 - `run()`: Start processing tasks (blocks)
@@ -272,8 +380,13 @@ Create a worker to process tasks.
 ```python
 from liteq.worker import Worker
 
+# Basic worker
 worker = Worker(queues=["default", "emails"], concurrency=4)
 worker.run()
+
+# Worker with timeout
+worker = Worker(queues=["default"], concurrency=4, task_timeout=300)
+worker.run()  # Kills tasks running longer than 5 minutes
 ```
 
 ### Monitoring Functions
@@ -300,6 +413,66 @@ Get recent failed tasks.
 
 Get currently active workers (heartbeat < 15 seconds ago).
 
+### Scheduler Functions
+
+All available in `liteq.scheduler`:
+
+#### `register_schedule(task_func, cron_expr, queue='default', **kwargs) -> int`
+
+Register a task to run on a schedule.
+
+**Example:**
+```python
+from liteq import task, register_schedule
+
+@task()
+def backup():
+    print("Backup running")
+
+# Every day at 2 AM
+schedule_id = register_schedule(backup, "0 2 * * *")
+
+# Every 5 minutes
+schedule_id = register_schedule(backup, "*/5 * * * *")
+```
+
+#### `Scheduler(check_interval=60)`
+
+Scheduler daemon that processes scheduled tasks.
+
+**Example:**
+```python
+from liteq.scheduler import Scheduler
+
+scheduler = Scheduler(check_interval=60)
+scheduler.run()  # Blocks
+```
+
+### FastAPI Integration
+
+All available in `liteq.fastapi`:
+
+#### `LiteQBackgroundTasks`
+
+FastAPI-like background tasks using LiteQ.
+
+**Example:**
+```python
+from fastapi import FastAPI
+from liteq.fastapi import LiteQBackgroundTasks
+
+app = FastAPI()
+
+@app.post("/send-email")
+async def send_email(background: LiteQBackgroundTasks):
+    background.add_task(send_email_task, "user@example.com")
+    return {"message": "queued"}
+```
+
+#### `enqueue_task(task_func, *args, **kwargs) -> int`
+
+Helper to enqueue a task.
+
 ### Database
 
 #### `init_db()`
@@ -310,7 +483,7 @@ Initialize the database schema. Called automatically by CLI.
 ```python
 from liteq.db import init_db
 
-init_db() (@task)
+init_db()
 │   ├── core.py           # Task decorator and registry
 │   ├── db.py             # Database layer (SQLite)
 │   ├── worker.py         # Worker implementation

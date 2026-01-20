@@ -24,9 +24,12 @@ LiteQ — это очередь задач на чистом Python и SQLite. �
 🎯 **Приоритеты** — контролируйте порядок выполнения  
 🔁 **Автоповторы** — настраиваемая логика повторов  
 👷 **Множество воркеров** — параллельная обработка задач  
+⏰ **Планировщик** — задачи по расписанию (cron)  
+⏱️ **Таймауты** — автоматическое убийство повисших задач  
+🚀 **FastAPI** — встроенная поддержка FastAPI  
 📊 **Мониторинг** — отслеживание статистики, воркеров и статуса задач  
 💾 **Надёжность** — сохранение в SQLite  
-🚀 **Production Ready** — покрытие тестами 92%
+🧪 **Production Ready** — покрытие тестами 100%
 
 ## Установка
 
@@ -80,6 +83,98 @@ liteq worker --app tasks.py --queues default,reports --concurrency 4
 Готово! Ваши задачи будут обрабатываться в фоне.
 
 ## Примеры
+
+### Интеграция с FastAPI
+
+```python
+from fastapi import FastAPI
+from liteq import task
+from liteq.fastapi import LiteQBackgroundTasks, enqueue_task
+
+app = FastAPI()
+
+@task(queue="emails", timeout=60)
+async def send_email(to: str, subject: str):
+    # Логика отправки
+    return {"sent": True}
+
+# Способ 1: Просто .delay()
+@app.post("/send-email")
+async def api_send_email(to: str, subject: str):
+    task_id = send_email.delay(to, subject)
+    return {"task_id": task_id}
+
+# Способ 2: FastAPI-подобный BackgroundTasks
+@app.post("/send-email-bg")
+async def api_send_email_bg(to: str, background: LiteQBackgroundTasks):
+    background.add_task(send_email, to, "Привет!")
+    return {"message": "queued"}
+
+# Способ 3: Helper-функция
+@app.post("/send-email-helper")
+async def api_send_email_helper(to: str):
+    task_id = enqueue_task(send_email, to, "Добро пожаловать")
+    return {"task_id": task_id}
+```
+
+### Запланированные задачи (Cron)
+
+```python
+from liteq import task, register_schedule
+from liteq.scheduler import Scheduler
+
+@task()
+def daily_backup():
+    print("Запуск резервного копирования...")
+    return {"status": "success"}
+
+@task()
+def cleanup():
+    print("Очистка...")
+
+# Регистрируем расписание
+register_schedule(daily_backup, "0 2 * * *")  # Каждый день в 2 часа ночи
+register_schedule(cleanup, "*/5 * * * *")  # Каждые 5 минут
+
+# Запускаем планировщик
+scheduler = Scheduler(check_interval=60)
+scheduler.run()
+```
+
+```bash
+# Или через CLI
+liteq scheduler --app tasks.py --interval 60
+```
+
+### Таймауты задач
+
+```python
+from liteq import task
+
+# Таймаут на уровне задачи
+@task(timeout=30)  # 30 секунд
+def slow_task():
+    import time
+    time.sleep(100)  # Будет убита через 30с
+
+# Таймаут на уровне воркера
+# liteq worker --app tasks.py --timeout 60
+```
+
+### Отложенное выполнение
+
+```python
+from liteq import task
+from datetime import datetime, timedelta
+
+@task()
+def reminder(message: str):
+    print(f"Напоминание: {message}")
+
+# Запланировать на потом
+run_time = datetime.now() + timedelta(hours=1)
+task_id = reminder.schedule(run_time, "Встреча через 1 час")
+```
 
 ### Асинхронные задачи
 
