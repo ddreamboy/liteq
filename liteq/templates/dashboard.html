@@ -9,25 +9,41 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg: #05070a;
-            --surface: #0f121a;
-            --surface-lighter: #161b26;
-            --border: #222938;
-            --primary: #6366f1;
-            --primary-glow: rgba(99, 102, 241, 0.3);
-            --text-main: #f1f5f9;
-            --text-muted: #94a3b8;
-            --success: #10b981;
+            /* Light Theme - Brutalist Style */
+            --bg: #ffffff;
+            --surface: #fffdf6;
+            --surface-lighter: #eef2ff;
+            --border: #000000;
+            --primary: #ffbd7a;
+            --primary-hover: #ffad5c;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --success: #4ade80;
             --error: #ef4444;
             --warning: #f59e0b;
+            --running: #10b981;
+        }
+
+        [data-theme="dark"] {
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --surface-lighter: #334155;
+            --border: #000000;
+            --primary: #f59e0b;
+            --primary-hover: #d97706;
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --success: #22c55e;
+            --running: #10b981;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background-color: var(--bg);
             color: var(--text-main);
             overflow-x: hidden;
+            transition: background-color 0.3s, color 0.3s;
         }
 
         /* Layout */
@@ -35,15 +51,25 @@
         
         header {
             padding: 1.5rem 2rem;
-            background: rgba(15, 18, 26, 0.8);
-            backdrop-filter: blur(12px);
-            border-bottom: 1px solid var(--border);
-            position: sticky; top: 0; z-index: 100;
+            background: var(--bg);
+            border-bottom: 3px solid var(--border);
             display: flex; justify-content: space-between; align-items: center;
         }
 
-        .logo { display: flex; align-items: center; gap: 0.75rem; font-weight: 800; font-size: 1.5rem; letter-spacing: -0.02em; }
-        .logo span { color: var(--primary); }
+        .logo { 
+            display: flex; align-items: center; gap: 0.5rem; 
+            font-weight: 900; font-size: 1.5rem; letter-spacing: -0.02em; 
+        }
+        .logo span { color: #e11d48; }
+
+        .theme-toggle {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 20px;
+            color: var(--text-main);
+            padding: 5px;
+        }
 
         main { padding: 2rem; max-width: 1400px; margin: 0 auto; width: 100%; }
 
@@ -56,70 +82,163 @@
 
         .stat-card {
             background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 16px;
+            border: 3px solid var(--border);
+            border-radius: 12px;
             padding: 1.5rem;
             position: relative;
-            overflow: hidden;
+            box-shadow: 5px 5px 0px var(--border);
+            transition: transform 0.1s;
+        }
+        .stat-card:hover {
+            transform: translate(2px, 2px);
+            box-shadow: 3px 3px 0px var(--border);
         }
 
-        .stat-card h3 { font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+        .stat-card h3 { 
+            font-size: 0.75rem; text-transform: uppercase; 
+            color: var(--text-muted); letter-spacing: 0.05em; 
+            margin-bottom: 0.5rem; font-weight: 700;
+        }
         .stat-card .value { font-family: 'JetBrains Mono', monospace; font-size: 2.5rem; font-weight: 700; }
-        .stat-card .icon { position: absolute; right: -10px; bottom: -10px; opacity: 0.05; transform: rotate(-15deg); }
+        .stat-card .icon { position: absolute; right: 10px; bottom: 10px; opacity: 0.08; }
 
         /* Charts Section */
         .charts-row {
             display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; margin-bottom: 2rem;
         }
-        .chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 1.5rem; height: 300px; }
+        .chart-container { 
+            background: var(--surface); 
+            border: 3px solid var(--border); 
+            border-radius: 12px; 
+            padding: 1.5rem; 
+            height: 300px; 
+            box-shadow: 5px 5px 0px var(--border);
+        }
 
         /* Navigation */
-        .nav-tabs { display: flex; gap: 1rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 1px; }
-        .tab {
-            padding: 0.75rem 1.5rem; cursor: pointer; color: var(--text-muted); font-weight: 600;
-            border-bottom: 2px solid transparent; transition: 0.2s;
+        .nav-tabs { 
+            display: flex; gap: 1rem; margin-bottom: 1.5rem; 
+            border-bottom: 3px solid var(--border); 
+            padding-bottom: 0;
         }
-        .tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+        .tab {
+            padding: 0.75rem 1.5rem; cursor: pointer; 
+            color: var(--text-muted); font-weight: 700;
+            border: 3px solid transparent;
+            border-bottom: none;
+            background: transparent;
+            transition: all 0.1s;
+            position: relative;
+            top: 3px;
+        }
+        .tab.active { 
+            color: var(--text-main); 
+            background: var(--surface);
+            border-color: var(--border);
+            border-bottom-color: var(--surface);
+        }
+        .tab:not(.active):hover {
+            background: var(--surface-lighter);
+        }
 
         /* Workers & Queues */
-        .grid-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 1rem; }
+        .grid-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 1.5rem; }
         .worker-card {
-            background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem;
+            background: var(--surface); 
+            border: 3px solid var(--border); 
+            border-radius: 12px; 
+            padding: 1.25rem;
             display: flex; flex-direction: column; gap: 1rem;
+            box-shadow: 4px 4px 0px var(--border);
         }
         .worker-header { display: flex; justify-content: space-between; align-items: center; }
-        .status-pill { display: flex; align-items: center; gap: 0.4rem; font-size: 0.75rem; font-weight: 700; padding: 0.25rem 0.6rem; border-radius: 20px; }
-        .status-pill.online { background: rgba(16, 185, 129, 0.1); color: var(--success); }
+        .status-pill { 
+            display: flex; align-items: center; gap: 0.4rem; 
+            font-size: 0.7rem; font-weight: 800; 
+            padding: 0.4rem 0.8rem; 
+            border: 2px solid var(--border);
+            border-radius: 6px;
+            box-shadow: 2px 2px 0px var(--border);
+        }
+        .status-pill.online { background: var(--success); color: #000; }
 
         /* Tables */
-        .table-container { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
+        .table-container { 
+            background: var(--surface); 
+            border: 3px solid var(--border); 
+            border-radius: 12px; 
+            overflow: hidden; 
+            box-shadow: 5px 5px 0px var(--border);
+        }
         table { width: 100%; border-collapse: collapse; text-align: left; }
-        th { padding: 1rem; font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); border-bottom: 1px solid var(--border); }
+        th { 
+            padding: 1rem; font-size: 0.75rem; text-transform: uppercase; 
+            color: var(--text-muted); border-bottom: 2px solid var(--border); 
+            font-weight: 800; background: var(--surface-lighter);
+        }
         td { padding: 1rem; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
         tr:last-child td { border-bottom: none; }
         .mono { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; }
 
         /* Status Badges */
-        .badge { padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; }
+        .badge { 
+            padding: 0.35rem 0.7rem; 
+            border: 2px solid var(--border);
+            border-radius: 6px; 
+            font-size: 0.7rem; 
+            font-weight: 800; 
+            text-transform: uppercase; 
+            box-shadow: 2px 2px 0px var(--border);
+            display: inline-block;
+        }
         .badge.pending { background: #3b82f6; color: white; }
-        .badge.running { background: var(--success); color: white; box-shadow: 0 0 15px rgba(16, 185, 129, 0.3); }
+        .badge.running { background: var(--running); color: white; }
         .badge.failed { background: var(--error); color: white; }
-        .badge.done { background: #475569; color: white; }
+        .badge.done { background: #64748b; color: white; }
 
         /* Buttons */
         .btn {
-            background: var(--surface-lighter); border: 1px solid var(--border); color: var(--text-main);
-            padding: 0.5rem 0.8rem; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.75rem;
-            display: inline-flex; align-items: center; gap: 0.4rem; transition: 0.2s;
+            background: var(--surface-lighter); 
+            border: 2px solid var(--border); 
+            color: var(--text-main);
+            padding: 0.5rem 0.8rem; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            font-weight: 700; 
+            font-size: 0.75rem;
+            display: inline-flex; 
+            align-items: center; 
+            gap: 0.4rem; 
+            transition: all 0.1s;
+            box-shadow: 2px 2px 0px var(--border);
         }
-        .btn:hover { border-color: var(--primary); background: var(--primary); }
-        .btn-danger:hover { background: var(--error); border-color: var(--error); }
+        .btn:hover:not(:disabled) { 
+            transform: translate(1px, 1px);
+            box-shadow: 1px 1px 0px var(--border);
+        }
+        .btn:active:not(:disabled) { 
+            transform: translate(2px, 2px);
+            box-shadow: 0px 0px 0px var(--border);
+        }
+        .btn-danger:hover { background: var(--error); color: white; }
 
         .hidden { display: none; }
 
         /* Spinner */
-        .loader { width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; }
+        .loader { 
+            width: 16px; height: 16px; 
+            border: 2px solid var(--border); 
+            border-top-color: var(--primary); 
+            border-radius: 50%; 
+            animation: spin 0.8s linear infinite; 
+        }
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        @media (max-width: 768px) {
+            .charts-row { grid-template-columns: 1fr; }
+            .grid-list { grid-template-columns: 1fr; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+        }
     </style>
 </head>
 <body>
@@ -127,8 +246,12 @@
         <header>
             <div class="logo"><i data-lucide="zap"></i> LITE<span>Q</span></div>
             <div style="display: flex; align-items: center; gap: 1rem;">
-                <div id="sync-status" class="status-pill online"><div class="loader" id="main-loader" style="display:none"></div> LIVE</div>
+                <div id="sync-status" class="status-pill online">
+                    <div class="loader" id="main-loader" style="display:none"></div> 
+                    <span>LIVE</span>
+                </div>
                 <div style="font-size: 0.75rem; color: var(--text-muted)" id="last-update">Syncing...</div>
+                <button class="theme-toggle" id="theme-btn">🌙</button>
             </div>
         </header>
 
@@ -198,7 +321,22 @@
             </div>
         </main>
     </div>
+// Dark mode logic
+        const themeBtn = document.getElementById('theme-btn');
+        const html = document.documentElement;
+        const savedTheme = localStorage.getItem('liteq-theme') || 'light';
+        html.setAttribute('data-theme', savedTheme);
+        themeBtn.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
 
+        themeBtn.addEventListener('click', () => {
+            const current = html.getAttribute('data-theme');
+            const newTheme = current === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', newTheme);
+            themeBtn.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+            localStorage.setItem('liteq-theme', newTheme);
+        });
+
+        
     <script>
         lucide.createIcons();
 
