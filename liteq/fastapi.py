@@ -13,7 +13,7 @@ class LiteQBackgroundTasks:
         from liteq.fastapi import LiteQBackgroundTasks
 
         @app.post("/send-email")
-        async def send_email(background: LiteQBackgroundTasks):
+        async def send_email(background: LiteQBackgroundTasks = Depends()):
             task_id = background.add_task(send_email_task, "user@example.com")
             return {"message": "Email queued", "task_id": task_id}
     """

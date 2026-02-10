@@ -104,7 +104,7 @@ That's it! Your tasks will be processed in the background.
 ### FastAPI Integration
 
 ```python
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from liteq import task, get_task_status
 from liteq.fastapi import LiteQBackgroundTasks, enqueue_task
 
@@ -123,7 +123,7 @@ async def api_send_email(to: str, subject: str):
 
 # Method 2: FastAPI-like BackgroundTasks with status checking
 @app.post("/send-email-bg")
-async def api_send_email_bg(to: str, background: LiteQBackgroundTasks):
+async def api_send_email_bg(to: str, background: LiteQBackgroundTasks = Depends()):
     task_id = background.add_task(send_email, to, "Hello!")
     return {"message": "queued", "task_id": task_id}
 
@@ -524,7 +524,7 @@ FastAPI-like background tasks using LiteQ.
 
 **Example:**
 ```python
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from liteq.fastapi import LiteQBackgroundTasks
 from liteq import task
 
@@ -536,12 +536,12 @@ def send_email_task(to: str):
     return {"sent": True}
 
 @app.post("/send-email")
-async def send_email(to: str, background: LiteQBackgroundTasks):
+async def send_email(to: str, background: LiteQBackgroundTasks = Depends()):
     task_id = background.add_task(send_email_task, to)
     return {"message": "queued", "task_id": task_id}
 
 @app.post("/batch-emails")
-async def batch_emails(recipients: list[str], background: LiteQBackgroundTasks):
+async def batch_emails(recipients: list[str], background: LiteQBackgroundTasks = Depends()):
     for recipient in recipients:
         background.add_task(send_email_task, recipient)
     
@@ -551,7 +551,7 @@ async def batch_emails(recipients: list[str], background: LiteQBackgroundTasks):
     }
 
 @app.get("/batch-status")
-async def batch_status(background: LiteQBackgroundTasks):
+async def batch_status(background: LiteQBackgroundTasks = Depends()):
     statuses = background.get_all_statuses()
     return {"tasks": statuses}
 ```

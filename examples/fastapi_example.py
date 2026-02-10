@@ -13,7 +13,7 @@ import time
 from datetime import datetime
 from typing import Optional
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from pydantic import BaseModel
 
 from liteq import task
@@ -105,7 +105,7 @@ async def api_send_email_helper(email: EmailRequest):
 
 
 @app.post("/send-email-background")
-async def api_send_email_background(email: EmailRequest, background: LiteQBackgroundTasks):
+async def api_send_email_background(email: EmailRequest, background: LiteQBackgroundTasks = Depends()):
     """
     Use LiteQBackgroundTasks (FastAPI-like interface).
 

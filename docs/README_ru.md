@@ -104,7 +104,7 @@ liteq worker --app tasks.py --queues default,reports --concurrency 4
 ### Интеграция с FastAPI
 
 ```python
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from liteq import task, get_task_status
 from liteq.fastapi import LiteQBackgroundTasks, enqueue_task
 
@@ -123,7 +123,7 @@ async def api_send_email(to: str, subject: str):
 
 # Способ 2: FastAPI-подобный BackgroundTasks с проверкой статуса
 @app.post("/send-email-bg")
-async def api_send_email_bg(to: str, background: LiteQBackgroundTasks):
+async def api_send_email_bg(to: str, background: LiteQBackgroundTasks = Depends()):
     task_id = background.add_task(send_email, to, "Привет!")
     return {"message": "queued", "task_id": task_id}
 

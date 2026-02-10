@@ -98,7 +98,7 @@ worker = Worker(queues=["default"], concurrency=4, task_timeout=300)
 
 **New Features - FastAPI:**
 ```python
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from liteq import task
 from liteq.fastapi import LiteQBackgroundTasks
 
@@ -109,7 +109,7 @@ def send_email(to: str):
     pass
 
 @app.post("/send")
-async def send(to: str, background: LiteQBackgroundTasks):
+async def send(to: str, background: LiteQBackgroundTasks = Depends()):
     background.add_task(send_email, to)
     return {"status": "queued"}
 ```

@@ -34,6 +34,26 @@ else
     echo -e "${GREEN}[+] Updated version in pyproject.toml${NC}"
 fi
 
+# Check if version already exists on PyPI
+echo -e "${YELLOW}Checking if version ${VERSION} exists on PyPI...${NC}"
+PYPI_CHECK=$(curl -s "https://pypi.org/pypi/liteq/${VERSION}/json" | grep -o "\"version\":\"${VERSION}\"" || echo "")
+if [ -n "$PYPI_CHECK" ]; then
+    echo -e "${RED}[!] Version ${VERSION} already exists on PyPI!${NC}"
+    echo -e "${RED}Cannot release the same version twice.${NC}"
+    echo -e "Visit: https://pypi.org/project/liteq/${VERSION}/"
+    exit 1
+else
+    echo -e "${GREEN}[+] Version ${VERSION} not found on PyPI, can proceed${NC}"
+fi
+
+# Check if git tag already exists
+if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
+    echo -e "${YELLOW}Warning: Git tag v${VERSION} already exists locally${NC}"
+    SKIP_GIT_TAG=true
+else
+    SKIP_GIT_TAG=false
+fi
+
 # Check if git working directory is clean
 if [[ -n $(git status -s) ]]; then
     echo -e "${YELLOW}Warning: Working directory is not clean. Uncommitted changes:${NC}"
@@ -71,19 +91,29 @@ if [ -n "$1" ]; then
     fi
 fi
 
-# Create git tag
-echo -e "${YELLOW}Creating git tag v${VERSION}...${NC}"
-git tag -a "v${VERSION}" -m "Release version ${VERSION}"
-echo -e "${GREEN}[+] Git tag created${NC}"
+# Create git tag if it doesn't exist
+if [ "$SKIP_GIT_TAG" = true ]; then
+    echo -e "${YELLOW}Skipping git tag creation (v${VERSION} already exists)${NC}"
+else
+    echo -e "${YELLOW}Creating git tag v${VERSION}...${NC}"
+    git tag -a "v${VERSION}" -m "Release version ${VERSION}"
+    echo -e "${GREEN}[+] Git tag created${NC}"
+fi
 
 # Get current branch name
 BRANCH=$(git branch --show-current)
 
 # Push to GitHub
-echo -e "${YELLOW}Pushing to GitHub (branch: ${BRANCH})...${NC}"
-git push origin "${BRANCH}"
-git push origin "v${VERSION}"
-echo -e "${GREEN}[+] Pushed to GitHub${NC}"
+if [ "$SKIP_GIT_TAG" = true ]; then
+    echo -e "${YELLOW}Pushing to GitHub (branch: ${BRANCH})...${NC}"
+    git push origin "${BRANCH}"
+    echo -e "${GREEN}[+] Pushed to GitHub (tag already exists remotely)${NC}"
+else
+    echo -e "${YELLOW}Pushing to GitHub (branch: ${BRANCH})...${NC}"
+    git push origin "${BRANCH}"
+    git push origin "v${VERSION}"
+    echo -e "${GREEN}[+] Pushed to GitHub${NC}"
+fi
 
 # Ask before publishing to PyPI
 echo -e "${YELLOW}Ready to publish to PyPI.${NC}"
